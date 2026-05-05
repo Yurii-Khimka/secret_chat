@@ -5,19 +5,20 @@ import '../theme/app_theme.dart';
 import '../components/app_scaffold.dart';
 import '../components/app_button.dart';
 import '../components/app_text_field.dart';
+import '../network/chat_client.dart';
 import 'chat_screen.dart';
 
 class JoinRoomScreen extends StatefulWidget {
-  const JoinRoomScreen({super.key, required this.theme});
+  const JoinRoomScreen({super.key, required this.theme, required this.chatClient});
 
   final AppTheme theme;
+  final ChatClient chatClient;
 
   @override
   State<JoinRoomScreen> createState() => _JoinRoomScreenState();
 }
 
 class _JoinRoomScreenState extends State<JoinRoomScreen> {
-  // 8 code slots: 4 prefix + 4 suffix
   final List<TextEditingController> _codeControllers =
       List.generate(8, (_) => TextEditingController());
   final List<FocusNode> _codeFocusNodes = List.generate(8, (_) => FocusNode());
@@ -25,8 +26,12 @@ class _JoinRoomScreenState extends State<JoinRoomScreen> {
   final _nicknameController = TextEditingController();
   final _passwordController = TextEditingController();
 
+  bool _connecting = false;
+  String? _error;
+
   @override
   void dispose() {
+    widget.chatClient.removeListener(_onClientChanged);
     for (final c in _codeControllers) {
       c.dispose();
     }
@@ -68,6 +73,50 @@ class _JoinRoomScreenState extends State<JoinRoomScreen> {
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
+  }
+
+  static const _errorMessages = {
+    'not_found': '[ERROR] no such room',
+    'room_full': '[ERROR] room is full',
+    'bad_message': '[ERROR] invalid code',
+    'cannot_join_own': "[ERROR] that's your own code",
+  };
+
+  String _mapError(String? code) {
+    return _errorMessages[code] ?? '[ERROR] connection failed';
+  }
+
+  void _onClientChanged() {
+    if (!mounted) return;
+    final client = widget.chatClient;
+    if (client.state == ChatConnectionState.paired && _connecting) {
+      _connecting = false;
+      client.removeListener(_onClientChanged);
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => ChatScreen(
+            theme: widget.theme,
+            chatClient: client,
+          ),
+        ),
+      );
+    } else if (client.state == ChatConnectionState.error && _connecting) {
+      _connecting = false;
+      setState(() {
+        _error = _mapError(client.lastError);
+      });
+    }
+  }
+
+  Future<void> _connect() async {
+    // TODO(task-8): wire password to Argon2
+    setState(() {
+      _connecting = true;
+      _error = null;
+    });
+    widget.chatClient.addListener(_onClientChanged);
+    await widget.chatClient.joinRoom(_roomCode);
+    _onClientChanged();
   }
 
   @override
@@ -206,25 +255,23 @@ class _JoinRoomScreenState extends State<JoinRoomScreen> {
               ),
             ),
 
+            // ── Error text ─────────────────────────────
+            if (_error != null) ...[
+              Text(
+                _error!,
+                style: AppTypography.mono.copyWith(color: p.warning),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+            ],
+
             // ── Connect button ──────────────────────────
             AppButton(
-              label: 'Connect',
+              label: _connecting ? 'Connecting...' : 'Connect',
               palette: p,
               expand: true,
-              enabled: _codeComplete,
+              enabled: _codeComplete && !_connecting,
               sub: 'Verifies the room and derives the shared key',
-              onPressed: _codeComplete
-                  ? () {
-                      Navigator.of(context).pushReplacement(
-                        MaterialPageRoute(
-                          builder: (_) => ChatScreen(
-                            theme: widget.theme,
-                            roomCode: _roomCode,
-                          ),
-                        ),
-                      );
-                    }
-                  : null,
+              onPressed: _codeComplete && !_connecting ? _connect : null,
             ),
             const SizedBox(height: AppSpacing.xl),
           ],

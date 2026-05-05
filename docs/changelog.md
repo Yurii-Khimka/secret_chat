@@ -4,6 +4,17 @@ _Most recent changes appear at the top._
 
 ---
 
+## 2026-05-05 — Flutter WebSocket client + real pairing
+
+- Added `web_socket_channel ^3.0.0`; created `lib/network/` with server_config, protocol (sealed classes), chat_client (ChangeNotifier)
+- Wired all 4 screens to real server: create room, join room, live chat, peer disconnect
+- App lifecycle observer: paused/detached → close client
+- Error codes mapped to fixed UI strings (never echo server reason)
+- 15 protocol tests, 4 existing widget tests still pass
+- No crypto yet — plaintext payloads (Phase 2 tasks 8–9)
+- Branch: task/flutter-network-client
+- Commit: feat: flutter websocket client and real-server pairing
+
 ## 2026-05-05 — Lifecycle hardening + Phase 1 closeout
 
 - Documented shutdown contract verbatim in server.js and README

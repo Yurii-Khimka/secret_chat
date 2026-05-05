@@ -1,4 +1,3 @@
-import 'dart:math';
 import 'package:flutter/material.dart';
 import '../tokens/tokens.dart';
 import '../theme/app_theme.dart';
@@ -6,19 +5,82 @@ import '../components/app_scaffold.dart';
 import '../components/app_button.dart';
 import '../theme/theme_controller.dart';
 import '../components/pulse_dot.dart';
+import '../network/chat_client.dart';
 import 'room_created_screen.dart';
 import 'join_room_screen.dart';
 import 'settings_screen.dart';
 
-class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key, required this.theme, required this.controller});
+class HomeScreen extends StatefulWidget {
+  const HomeScreen({
+    super.key,
+    required this.theme,
+    required this.controller,
+    required this.chatClient,
+  });
 
   final AppTheme theme;
   final ThemeController controller;
+  final ChatClient chatClient;
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  bool _creating = false;
+  String? _error;
+
+  void _onClientChanged() {
+    if (!mounted) return;
+    final client = widget.chatClient;
+    if (client.state == ChatConnectionState.connected && _creating) {
+      _creating = false;
+      _error = null;
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => RoomCreatedScreen(
+            theme: widget.theme,
+            chatClient: client,
+          ),
+        ),
+      );
+      setState(() {});
+    } else if (client.state == ChatConnectionState.error && _creating) {
+      _creating = false;
+      setState(() {
+        _error = _mapError(client.lastError);
+      });
+    }
+  }
+
+  String _mapError(String? code) {
+    return switch (code) {
+      'connection_failed' => '[ERROR] failed to connect',
+      'already_in_room' => '[ERROR] already in a room',
+      _ => '[ERROR] failed to create room',
+    };
+  }
+
+  Future<void> _createRoom() async {
+    setState(() {
+      _creating = true;
+      _error = null;
+    });
+    widget.chatClient.addListener(_onClientChanged);
+    await widget.chatClient.createRoom();
+    // If state already changed synchronously
+    _onClientChanged();
+  }
+
+  @override
+  void dispose() {
+    widget.chatClient.removeListener(_onClientChanged);
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final p = theme.palette;
+    final p = widget.theme.palette;
 
     return AppScaffold(
       palette: p,
@@ -48,8 +110,8 @@ class HomeScreen extends StatelessWidget {
                       Navigator.of(context).push(
                         MaterialPageRoute(
                           builder: (_) => SettingsScreen(
-                            theme: theme,
-                            controller: controller,
+                            theme: widget.theme,
+                            controller: widget.controller,
                           ),
                         ),
                       );
@@ -122,23 +184,23 @@ class HomeScreen extends StatelessWidget {
               ),
             ),
 
+            // ── Error text ─────────────────────────────
+            if (_error != null) ...[
+              Text(
+                _error!,
+                style: AppTypography.mono.copyWith(color: p.warning),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+            ],
+
             // ── Bottom buttons ──────────────────────────
             AppButton(
-              label: 'Create Room',
+              label: _creating ? 'Connecting...' : 'Create Room',
               palette: p,
               expand: true,
+              enabled: !_creating,
               sub: 'Generates a new code + key pair',
-              onPressed: () {
-                final code = _generateFakeRoomCode();
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => RoomCreatedScreen(
-                      theme: theme,
-                      roomCode: code,
-                    ),
-                  ),
-                );
-              },
+              onPressed: _creating ? null : _createRoom,
             ),
             const SizedBox(height: AppSpacing.md),
             AppButton(
@@ -150,7 +212,10 @@ class HomeScreen extends StatelessWidget {
               onPressed: () {
                 Navigator.of(context).push(
                   MaterialPageRoute(
-                    builder: (_) => JoinRoomScreen(theme: theme),
+                    builder: (_) => JoinRoomScreen(
+                      theme: widget.theme,
+                      chatClient: widget.chatClient,
+                    ),
                   ),
                 );
               },
@@ -168,14 +233,6 @@ class HomeScreen extends StatelessWidget {
       ),
     );
   }
-}
-
-String _generateFakeRoomCode() {
-  const words = ['WOLF', 'BEAR', 'HAWK', 'LYNX', 'CROW', 'DEER', 'FROG', 'MOTH'];
-  final rng = Random();
-  final word = words[rng.nextInt(words.length)];
-  final num = (rng.nextInt(9000) + 1000).toString();
-  return '$word-$num';
 }
 
 class _DiagRow extends StatelessWidget {

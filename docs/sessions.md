@@ -22,6 +22,7 @@
 - [x] Connection lifecycle + cleanup on disconnect
 
 ### Phase 2 — Security
+- [x] Task 7 — Flutter WS client + real pairing (no crypto yet) (`task/flutter-network-client`)
 - [ ] Argon2 password → key derivation on device
 - [ ] AES-256 message encryption on device
 - [ ] Verify zero server-side logging (no IPs, no payloads, no metadata beyond room code)
@@ -244,6 +245,28 @@ Done
 
 ### Branch
 task/server-lifecycle-hardening
+
+### Status
+Done
+
+---
+
+## Session 2026-05-05 — Flutter network client + real pairing
+
+### Completed
+- Added `web_socket_channel ^3.0.0` dependency (sole new dep)
+- Created `lib/network/`: `server_config.dart`, `protocol.dart` (sealed classes + builders), `chat_client.dart` (ChangeNotifier state machine)
+- Wired HomeScreen: CREATE ROOM calls server, shows CONNECTING... state, pushes RoomCreatedScreen on success
+- Wired RoomCreatedScreen: reads code from ChatClient, listens for peer_joined → auto-navigates to ChatScreen
+- Wired JoinRoomScreen: CONNECT validates code, sends join_room, error mapping table, navigates on paired
+- Wired ChatScreen: live message list from ChatClient, peer_left shows system message + disables composer
+- App lifecycle: paused/detached → chatClient.close() (first piece of "everything deleted on close")
+- 15 protocol unit tests + 4 existing widget tests pass (19 total)
+- Zero payload logging in ChatClient (grep verified)
+- Server tests still 29/29
+
+### Branch
+task/flutter-network-client
 
 ### Status
 Done
