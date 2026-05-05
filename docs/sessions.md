@@ -28,3 +28,21 @@ task/flutter-scaffold
 
 ### Status
 Done
+
+---
+
+## Session 2026-05-05 — Tokens, 5 theme palettes, and ThemeController
+
+### Completed
+- Created tokens module (AppSpacing, AppRadii, AppDurations, AppTypography, AppPalette)
+- Created 5 theme palettes (Mint, Ice, Indigo, Sand, Lime) with hex values from design
+- Created ThemeController with shared_preferences persistence
+- Wired smoke-test screen in main.dart
+- flutter analyze — clean
+- flutter test — 1/1 passed
+
+### Branch
+task/design-tokens
+
+### Status
+Done

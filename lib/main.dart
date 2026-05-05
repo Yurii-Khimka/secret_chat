@@ -1,122 +1,163 @@
 import 'package:flutter/material.dart';
+import 'theme/theme_controller.dart';
+import 'theme/app_theme.dart';
+import 'theme/app_theme_name.dart';
+import 'tokens/tokens.dart';
 
-void main() {
-  runApp(const MyApp());
+final _themeController = ThemeController();
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await _themeController.load();
+  runApp(const SecretChatApp());
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class SecretChatApp extends StatelessWidget {
+  const SecretChatApp({super.key});
 
-  // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Flutter Demo',
-      theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // TRY THIS: Try running your application with "flutter run". You'll see
-        // the application has a purple toolbar. Then, without quitting the app,
-        // try changing the seedColor in the colorScheme below to Colors.green
-        // and then invoke "hot reload" (save your changes or press the "hot
-        // reload" button in a Flutter-supported IDE, or press "r" if you used
-        // the command line to start the app).
-        //
-        // Notice that the counter didn't reset back to zero; the application
-        // state is not lost during the reload. To reset the state, use hot
-        // restart instead.
-        //
-        // This works for code too, not just values: Most code changes can be
-        // tested with just a hot reload.
-        colorScheme: .fromSeed(seedColor: Colors.deepPurple),
-      ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
+    return AnimatedBuilder(
+      animation: _themeController,
+      builder: (context, _) {
+        final theme = _themeController.theme;
+        return MaterialApp(
+          title: 'Secret Chat',
+          debugShowCheckedModeBanner: false,
+          home: _ThemeSmokeScreen(
+            theme: theme,
+            controller: _themeController,
+          ),
+        );
+      },
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
+/// Temporary smoke-test screen — will be deleted in Task 3.
+class _ThemeSmokeScreen extends StatelessWidget {
+  const _ThemeSmokeScreen({
+    required this.theme,
+    required this.controller,
+  });
 
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
-  final String title;
-
-  @override
-  State<MyHomePage> createState() => _MyHomePageState();
-}
-
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
-
-  void _incrementCounter() {
-    setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
-    });
-  }
+  final AppTheme theme;
+  final ThemeController controller;
 
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
+    final palette = theme.palette;
+
     return Scaffold(
-      appBar: AppBar(
-        // TRY THIS: Try changing the color here to a specific color (to
-        // Colors.amber, perhaps?) and trigger a hot reload to see the AppBar
-        // change color while the other colors stay the same.
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
-      ),
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
-        child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          //
-          // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
-          // action in the IDE, or press "p" in the console), to see the
-          // wireframe for each widget.
-          mainAxisAlignment: .center,
-          children: [
-            const Text('You have pushed the button this many times:'),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-          ],
+      backgroundColor: palette.background,
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.xl),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Active theme: ${theme.name.name}',
+                style: AppTypography.body.copyWith(color: palette.accent),
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              // Theme selector
+              Wrap(
+                spacing: AppSpacing.sm,
+                children: AppThemeName.values.map((name) {
+                  final isActive = name == controller.current;
+                  return GestureDetector(
+                    onTap: () => controller.setTheme(name),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.md,
+                        vertical: AppSpacing.sm,
+                      ),
+                      decoration: BoxDecoration(
+                        color: isActive ? palette.accent : palette.surface,
+                        borderRadius: BorderRadius.circular(AppRadii.sm),
+                        border: Border.all(
+                          color: isActive
+                              ? palette.accent
+                              : palette.borderHighlight,
+                        ),
+                      ),
+                      child: Text(
+                        name.name,
+                        style: AppTypography.caption.copyWith(
+                          color:
+                              isActive ? palette.accentText : palette.textPrimary,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: AppSpacing.xxl),
+              Text(
+                '// PALETTE SLOTS',
+                style: AppTypography.caption.copyWith(color: palette.textMuted),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              // Palette swatches
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Wrap(
+                    spacing: AppSpacing.sm,
+                    runSpacing: AppSpacing.sm,
+                    children: _buildSwatches(palette),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
-      ),
     );
+  }
+
+  List<Widget> _buildSwatches(AppPalette palette) {
+    final slots = <String, Color>{
+      'background': palette.background,
+      'surface': palette.surface,
+      'surfaceMuted': palette.surfaceMuted,
+      'border': palette.border,
+      'borderHighlight': palette.borderHighlight,
+      'textPrimary': palette.textPrimary,
+      'textSecondary': palette.textSecondary,
+      'textMuted': palette.textMuted,
+      'accent': palette.accent,
+      'accentMuted': palette.accentMuted,
+      'accentText': palette.accentText,
+      'accentGhost': palette.accentGhost,
+      'accentGlow': palette.accentGlow,
+      'bubbleSent': palette.bubbleSent,
+      'bubbleSentText': palette.bubbleSentText,
+      'bubbleReceived': palette.bubbleReceived,
+      'bubbleReceivedText': palette.bubbleReceivedText,
+      'warning': palette.warning,
+    };
+
+    return slots.entries.map((entry) {
+      return Container(
+        width: 80,
+        height: 80,
+        decoration: BoxDecoration(
+          color: entry.value,
+          borderRadius: BorderRadius.circular(AppRadii.sm),
+          border: Border.all(color: palette.borderHighlight),
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          entry.key,
+          style: AppTypography.micro.copyWith(
+            color: palette.textPrimary,
+            letterSpacing: 0,
+          ),
+          textAlign: TextAlign.center,
+        ),
+      );
+    }).toList();
   }
 }
