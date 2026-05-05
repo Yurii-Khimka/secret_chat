@@ -4,6 +4,15 @@ _Most recent changes appear at the top._
 
 ---
 
+## 2026-05-05 — Component library + dev gallery
+
+- Built 8 components in lib/components/: AppScaffold, AppButton, AppTextField, AppText, MessageBubble, RoomCodeDisplay, PulseDot, SystemMessage
+- Created dev-only ComponentGalleryScreen with theme picker and all component states
+- Replaced Task 2 smoke screen with gallery as app home
+- All components read from active AppTheme — zero hardcoded values
+- Branch: task/component-library
+- Commit: feat: component library and dev component gallery
+
 ## 2026-05-05 — Design tokens, 5 theme palettes, ThemeController
 
 - Created lib/tokens/tokens.dart with AppSpacing, AppRadii, AppDurations, AppTypography, AppPalette (18 semantic color slots)

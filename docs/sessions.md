@@ -46,3 +46,21 @@ task/design-tokens
 
 ### Status
 Done
+
+---
+
+## Session 2026-05-05 — Component library + dev gallery
+
+### Completed
+- Built 6 required components: AppScaffold, AppButton, AppTextField, AppText, MessageBubble, RoomCodeDisplay
+- Built 2 extra components: PulseDot, SystemMessage
+- Created dev-only ComponentGalleryScreen with theme picker and all component states
+- Wired gallery as app home
+- flutter analyze — clean
+- flutter test — 1/1 passed
+
+### Branch
+task/component-library
+
+### Status
+Done

@@ -1,79 +1,67 @@
 # Last Task Result
 
 ## Task
-Design tokens, 5 theme palettes, and ThemeController (Task 2 of 5).
+Component library and dev-only Component Gallery (Task 3 of 5).
 
 ## Branch
-task/design-tokens
+task/component-library
 
 ## Commit
-feat: design tokens, 5 theme palettes, and theme controller
+feat: component library and dev component gallery
 
 ## What Was Done
 
 ### File tree under lib/
 ```
 lib/
-├── main.dart                          (smoke-test wire-up)
+├── main.dart                                (wires ComponentGalleryScreen)
 ├── tokens/
-│   └── tokens.dart                    (AppSpacing, AppRadii, AppDurations, AppTypography, AppPalette)
-└── theme/
-    ├── app_theme_name.dart            (enum AppThemeName)
-    ├── app_theme.dart                 (AppTheme with factory forName)
-    ├── theme_controller.dart          (ThemeController with shared_preferences)
-    └── palettes/
-        ├── mint_palette.dart          (default)
-        ├── ice_palette.dart
-        ├── indigo_palette.dart
-        ├── sand_palette.dart
-        └── lime_palette.dart
+│   └── tokens.dart
+├── theme/
+│   ├── app_theme.dart
+│   ├── app_theme_name.dart
+│   ├── theme_controller.dart
+│   └── palettes/
+│       ├── mint_palette.dart
+│       ├── ice_palette.dart
+│       ├── indigo_palette.dart
+│       ├── sand_palette.dart
+│       └── lime_palette.dart
+├── components/
+│   ├── app_scaffold.dart                    (NEW)
+│   ├── app_button.dart                      (NEW)
+│   ├── app_text_field.dart                  (NEW)
+│   ├── app_text.dart                        (NEW)
+│   ├── message_bubble.dart                  (NEW)
+│   ├── room_code_display.dart               (NEW)
+│   ├── pulse_dot.dart                       (NEW — extra)
+│   └── system_message.dart                  (NEW — extra)
+└── dev/
+    └── component_gallery_screen.dart        (NEW)
 ```
 
-### AppPalette slot descriptions
+### Components built
 
-| Slot | Intent |
-|------|--------|
-| background | Deep near-black background — T.bg |
-| surface | Slightly elevated surface — T.surface |
-| surfaceMuted | Higher elevation surface — T.surfaceHi |
-| border | Faint hairline border — T.hairline |
-| borderHighlight | Highlighted border — T.hairlineHi |
-| textPrimary | Primary foreground text — T.fg |
-| textSecondary | Dimmed secondary text — T.fgDim |
-| textMuted | Muted text for labels/hints — T.fgMute |
-| accent | Theme accent color — per-theme from ACCENTS |
-| accentMuted | Dimmed accent at 55% opacity |
-| accentText | Text on accent-filled surfaces |
-| accentGhost | Very faint accent tint for backgrounds (14%) |
-| accentGlow | Accent glow for shadows (32%) |
-| bubbleSent | Sent message bubble background |
-| bubbleSentText | Sent message bubble text |
-| bubbleReceived | Received message bubble background |
-| bubbleReceivedText | Received message bubble text |
-| warning | Warning color — T.warn |
+1. **AppScaffold** — Scaffold wrapper with palette background, safe areas, optional top/bottom bar slots
+2. **AppButton** — Variants: `primary`, `secondary`. Props: `label`, `onPressed`, `variant`, `enabled`, `expand`, `sub`. 56px min height, accent glow shadow on primary
+3. **AppTextField** — Focus-managed input with palette-driven border highlight. Props: `controller`, `placeholder`, `label`, `obscure`, `monospace`, `autoFocus`, `onChanged`, `prefixChar`, `trailingText`
+4. **AppText** — Variants: `heading`, `body`, `mono`, `caption`. Props: `text`, `variant`, `color`, `align`
+5. **MessageBubble** — Directions: `sent`, `received`. Asymmetric border radii from design. Props: `text`, `direction`, `senderLabel`
+6. **RoomCodeDisplay** — Large phosphor-glow code with gradient surface. Props: `code`, `onCopy`
 
-### 5 theme palettes — hex values
+### Extra components added
 
-| Slot | Mint | Ice | Indigo | Sand | Lime |
-|------|------|-----|--------|------|------|
-| background | #0A0D0B | #0A0D0B | #0A0D0B | #0A0D0B | #0A0D0B |
-| surface | #101512 | #101512 | #101512 | #101512 | #101512 |
-| surfaceMuted | #141A17 | #141A17 | #141A17 | #141A17 | #141A17 |
-| border | rgba(180,220,200,0.08) | rgba(180,220,200,0.08) | rgba(180,220,200,0.08) | rgba(180,220,200,0.08) | rgba(180,220,200,0.08) |
-| borderHighlight | rgba(127,224,163,0.18) | rgba(168,232,224,0.18) | rgba(154,166,255,0.18) | rgba(232,212,154,0.18) | rgba(200,240,138,0.18) |
-| textPrimary | #E2E6E2 | #E2E6E2 | #E2E6E2 | #E2E6E2 | #E2E6E2 |
-| textSecondary | #8A918A | #8A918A | #8A918A | #8A918A | #8A918A |
-| textMuted | #525A52 | #525A52 | #525A52 | #525A52 | #525A52 |
-| **accent** | **#7FE0A3** | **#A8E8E0** | **#9AA6FF** | **#E8D49A** | **#C8F08A** |
-| accentMuted | #7FE0A3 @55% | #A8E8E0 @55% | #9AA6FF @55% | #E8D49A @55% | #C8F08A @55% |
-| accentText | #06180E | #061816 | #060818 | #181406 | #0E1806 |
-| accentGhost | accent @14% | accent @14% | accent @14% | accent @14% | accent @14% |
-| accentGlow | accent @32% | accent @32% | accent @32% | accent @32% | accent @32% |
-| bubbleSent | accent @8% | accent @8% | accent @8% | accent @8% | accent @8% |
-| bubbleSentText | #E2E6E2 | #E2E6E2 | #E2E6E2 | #E2E6E2 | #E2E6E2 |
-| bubbleReceived | #101512 | #101512 | #101512 | #101512 | #101512 |
-| bubbleReceivedText | #E2E6E2 | #E2E6E2 | #E2E6E2 | #E2E6E2 | #E2E6E2 |
-| warning | #E6C067 | #E6C067 | #E6C067 | #E6C067 | #E6C067 |
+- **PulseDot** — Animated pulse indicator (screens.jsx `Pulse` component). Used in TermHeader and ChatScreen as live status signal. Repeating scale+opacity animation at 1.6s.
+- **SystemMessage** — Centered system/status text (screens.jsx chat "— session opened —"). Used between message bubbles for session events.
+
+### Design elements NOT built as components yet
+
+- **CodeBlock** (segmented 4-slot code input on Join screen) — complex interactive input, better built directly in JoinRoomScreen (Task 4)
+- **FakeKeyboard** — design-only mock keyboard, not needed in Flutter (OS provides real keyboard)
+- **TermHeader** — screen-specific header bar; will be composed per-screen in Task 4 using AppScaffold's topBar slot
+- **DiagCard** (diagnostics on Home screen) — small enough to inline in HomeScreen (Task 4)
+- **Step** (numbered steps on Room Created screen) — simple row, not component-grade; inline in Task 4
+- **Card** wrapper — trivial Container with border/radius, used via BoxDecoration directly
 
 ### Verification
 - `flutter analyze` — No issues found
@@ -83,7 +71,6 @@ lib/
 Done
 
 ## Notes
-- All hex values extracted from design JSX prototypes — none invented
-- Neutrals (bg, surface, text, border, warning) are shared across all themes; only accent-derived slots vary
-- Smoke screen in main.dart shows theme name + tappable theme selector + color swatches — will be deleted in Task 3
-- Widget test updated to match new app structure
+- PulseDot uses infinite animation — widget test uses `pump()` instead of `pumpAndSettle()` to avoid timeout
+- All components read exclusively from AppPalette/AppTypography/AppSpacing/AppRadii — zero hardcoded values
+- Gallery shows all components with multiple states (enabled/disabled, filled/empty, sent/received, etc.)
