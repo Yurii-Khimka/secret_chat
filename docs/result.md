@@ -1,76 +1,70 @@
 # Last Task Result
 
 ## Task
-Settings screen with theme picker and persistence verification (Task 5 of 5).
+Node.js server skeleton with /health endpoint (Phase 1, Task 1).
 
 ## Branch
-task/settings-and-theme-picker
+task/server-skeleton
 
 ## Commit
-feat: settings screen with theme picker and persistence verification
+feat: node.js server skeleton with /health endpoint
 
 ## What Was Done
 
-### File tree — created or modified
+### File tree — created under `server/`
 ```
-lib/
-├── main.dart                                (MODIFIED — controller now injectable)
-├── screens/
-│   ├── home_screen.dart                     (MODIFIED — added ⚙ SETTINGS entry + controller prop)
-│   └── settings_screen.dart                 (NEW)
-└── dev/
-    └── component_gallery_screen.dart        (preserved, reachable from Settings in debug)
-
-test/
-├── widget_test.dart                         (MODIFIED — passes controller)
-└── theme_persistence_test.dart              (NEW — 3 tests)
-```
-
-### SettingsScreen layout
-Each theme row: 10px accent circle swatch → theme name (mono uppercase) → `›` marker if active. 44px min height, highlight border + accentGhost fill on active row.
-
-### Developer section gating
-`kDebugMode` check at `lib/screens/settings_screen.dart:82`. The Developer section (with COMPONENT GALLERY link) is only rendered when `kDebugMode == true`. In release builds it is completely absent.
-
-### Three new persistence tests
-
-1. **`cold start loads Lime when persisted`** — Sets `{'app.theme': 'lime'}` in SharedPreferences mock, loads controller, asserts accent == Lime's accent hex (`0xFFC8F08A`)
-2. **`cold start falls back to Mint when empty`** — Sets empty SharedPreferences, loads controller, asserts accent == Mint's accent hex (`0xFF7FE0A3`)
-3. **`tapping Indigo in Settings persists choice`** — Pumps app, taps ⚙ SETTINGS, taps INDIGO row, asserts `controller.current == AppThemeName.indigo`, asserts `SharedPreferences.getString('app.theme') == 'indigo'`
-
-### Final navigation graph
-```
-              HomeScreen
-           /      |       \
-    [Create]   [Join]   [⚙ SETTINGS]
-       |          |          |
-  RoomCreated  JoinRoom  SettingsScreen
-       |          |       /        \
-  [Open Chat]  [Connect] [theme]  [GALLERY] (debug only)
-   (replace)   (replace)    |         |
-       \         /          |    ComponentGalleryScreen
-        ChatScreen          |
-            |            (pop)
-       [‹ back]             |
-      popUntil(first)       |
-            |               |
-         HomeScreen ←───────┘
+server/
+  package.json
+  package-lock.json
+  .gitignore
+  .nvmrc
+  README.md
+  src/
+    index.js
+    config.js
+    log.js
+  test/
+    smoke.test.js
 ```
 
-### Verification
+Root `.gitignore` — appended `server/node_modules/`.
+
+### Startup log line
+```
+[2026-05-05T11:53:26.623Z] [info] server listening on 127.0.0.1:3000
+```
+
+### curl verification
+```
+$ curl localhost:3000/health
+secret-chat-server v0.1.0
+```
+
+### npm test output
+```
+✔ GET /health returns 200 with version string (12ms)
+✔ GET /nope returns 404 (1ms)
+ℹ tests 2 | pass 2 | fail 0
+```
+
+### Flutter verification
 - `flutter analyze` — No issues found
-- `flutter test` — All tests passed (4/4: 1 smoke + 3 persistence)
+- `flutter test` — All tests passed (4/4)
 
-### Manual verification
-- SettingsScreen shows 5 theme rows (Mint, Ice, Indigo, Sand, Lime) in enum order ✓
-- Default theme is Mint (AppThemeName.defaultTheme) ✓
-- Developer section gated behind `kDebugMode` at settings_screen.dart:82 ✓
+### Logging policy confirmation
+`server/src/log.js:1-5` contains the "no client data ever" comment:
+```
+// HARD RULE: This logger MUST NEVER log request bodies, IP addresses, headers,
+// room codes, or anything derived from a client connection. It is for
+// server-lifecycle events only (startup, shutdown, internal errors). This rule
+// is the foundation of the "we cannot read your messages and we don't know who
+// you are" promise.
+```
 
 ## Status
 Done
 
 ## Notes
-- `SecretChatApp` now accepts a required `controller` parameter for testability
-- `themeController` in main.dart changed from private `_themeController` to public `themeController` for test access
-- ComponentGalleryScreen preserved in lib/dev/, reachable only via Settings → Developer (debug builds)
-- 5-task plan complete — ready for Phase 1 networking
+- `index.js` exports a `start(port)` function so the test can bind on port 0 (random free port). Running `node src/index.js` directly still works as the entry point.
+- Node v24 required `node --test test/*.test.js` glob instead of `node --test test/` directory form.
+- Zero runtime dependencies, zero dev dependencies — built-in modules only.

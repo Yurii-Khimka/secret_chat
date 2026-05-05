@@ -2,6 +2,41 @@
 
 ---
 
+## Roadmap
+
+### Phase 0 — Project setup & UI scaffolding ✅ complete
+- [x] Task 0 — Documentation structure (`task/project-setup`)
+- [x] Task 1 — Flutter scaffold + Claude Design fetched (`task/flutter-scaffold`)
+- [x] Task 2 — Design tokens + 5 theme palettes + ThemeController (`task/design-tokens`)
+- [x] Task 3 — Component library + dev gallery (`task/component-library`)
+- [x] Task 4 — Four production screens + navigation (`task/screens`)
+- [x] Task 5 — Settings screen + theme picker + persistence tests (`task/settings-and-theme-picker`)
+
+### Phase 1 — Foundation 🔜 next
+- [x] Merge Phase 0 branches into `main`
+- [x] Node.js server skeleton
+- [ ] WebSocket connection + TLS
+- [ ] Room creation (server-side code generation, in-memory only)
+- [ ] Room join flow (peer pairing by code)
+- [ ] Real-time message relay (encrypted payload pass-through, server cannot read)
+- [ ] Connection lifecycle + cleanup on disconnect
+
+### Phase 2 — Security
+- [ ] Argon2 password → key derivation on device
+- [ ] AES-256 message encryption on device
+- [ ] Verify zero server-side logging (no IPs, no payloads, no metadata beyond room code)
+- [ ] Session cleanup on app close (memory wipe)
+- [ ] Key verification handshake between peers
+
+### Phase 3 — Polish
+- [ ] Connection error handling + retry UX
+- [ ] Smooth session management (foreground/background, network drops)
+- [ ] Final terminal-UI pass against design
+- [ ] App store assets (icons, screenshots, privacy copy)
+- [ ] iOS + Android release builds
+
+---
+
 ## Session 2026-05-05 — Project setup
 
 ### Completed
@@ -98,6 +133,23 @@ Done
 
 ### Branch
 task/settings-and-theme-picker
+
+### Status
+Done
+
+---
+
+## Session 2026-05-05 — Node.js server skeleton
+
+### Completed
+- Created server/ directory with HTTP server skeleton (index.js, config.js, log.js)
+- /health endpoint returns 200 with version string; everything else 404
+- Logger enforces zero client-data policy (comment at log.js:1-5)
+- Smoke test passes (2/2) via Node built-in test runner
+- flutter analyze + flutter test still clean
+
+### Branch
+task/server-skeleton
 
 ### Status
 Done

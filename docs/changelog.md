@@ -4,6 +4,15 @@ _Most recent changes appear at the top._
 
 ---
 
+## 2026-05-05 — Node.js server skeleton
+
+- Created `server/` directory with HTTP server, /health endpoint, config, and logger
+- Zero runtime/dev dependencies — Node built-in modules only (http, test)
+- Logger enforces hard rule: no client-derived data ever logged
+- Smoke test: GET /health → 200, GET /nope → 404
+- Branch: task/server-skeleton
+- Commit: feat: node.js server skeleton with /health endpoint
+
 ## 2026-05-05 — Settings screen + theme picker + persistence tests
 
 - Built SettingsScreen with 5 theme rows (accent swatch + name + active marker) and kDebugMode-gated Developer section
