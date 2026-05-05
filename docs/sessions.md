@@ -305,3 +305,47 @@ task/flutter-network-client
 
 ### Status
 Done
+
+---
+
+## Phase 2 — Confirmed Constraints (locked 2026-05-05)
+
+These decisions are locked for the rest of Phase 2 (Argon2 + AES). Future tasks must not deviate without an explicit Tech Lead / Owner re-decision.
+
+### 1:1 only — no multi-user
+- One chat = exactly two participants. No N-party support, ever.
+- Multi-user is **deferred indefinitely** — out of scope for Phase 2 and Phase 3.
+
+### Phrase model — exact match, no retry
+- Phrase agreed **out-of-band** by users (in person, signal, etc.). The app never handles the agreement.
+- Phrase match is **100% exact, case-sensitive**. No trimming, normalisation, or fuzzy matching.
+- On mismatch: **no retry**. User must leave the room and reconnect from scratch.
+- Mismatch is **visible to both sides** (each side's AES-GCM auth tag fails on the peer's first message).
+
+### Phrase / key — never stored, never exposed
+- Phrase is **never stored** to disk, shared_preferences, keychain, or memory beyond the derivation step.
+- Phrase is **never displayed** in the UI, never copyable, never logged.
+- Derived AES key is **never displayed**, never copyable, never logged, never sent to the server.
+- Salt for Argon2id = **room code** (UTF-8 bytes). Both peers derive the same key independently.
+
+### Terminology (locked — use these exact words in UI and code)
+- **Room code** — `WOLF-7342`-style identifier from server. Sharable. Displayed and copyable in the UI.
+- **Phrase** — the human secret both users type. Never displayed.
+- **Key** — 256-bit AES key derived from `Argon2id(phrase, room_code)`. Never exposed.
+
+### Password mode — toggle on RoomCreatedScreen
+- Default: **OFF** (no-password mode — encrypted with hardcoded default key, equivalent to obfuscation).
+- Toggle lives on the **existing RoomCreatedScreen**. No new configuration screen.
+- Existing nickname feature is preserved as-is.
+- When ON: composer accepts only the phrase as the first message; locks until phrase match is confirmed; unlocks for real chat on success; shows mismatch state on failure.
+
+### UX over server flag for password-mode signalling
+- Joiner is told via **clear UI explanation** on ChatScreen, not a server protocol field.
+- Server protocol is **not extended** with a `password_required` boolean — keep the wire small.
+- A future task may add a server flag if UX proves insufficient; not now.
+
+### Crypto stack
+- **Argon2id**, parameters: `m = 64 MB, t = 3, p = 1, length = 32 bytes`. Salt = room code (UTF-8). Acknowledged: salt is below OWASP 16-byte minimum; accepted because chat is ephemeral and Argon2id cost is the actual barrier.
+- **AES-256-GCM**. **Random 12-byte IV per message**, never reused. IV transmitted alongside ciphertext (not secret).
+- Decryption failure (auth tag mismatch) is caught and surfaced as a UI label, never as a crash.
+- No-password mode uses a **hardcoded 256-bit default key** baked into the binary. UI must clearly state this is not real protection.
