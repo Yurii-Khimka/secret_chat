@@ -64,3 +64,22 @@ task/component-library
 
 ### Status
 Done
+
+---
+
+## Session 2026-05-05 — Four screens + navigation
+
+### Completed
+- Built HomeScreen, RoomCreatedScreen, JoinRoomScreen, ChatScreen
+- Wired full navigation: Home → Create Room → RoomCreated → Chat, Home → Join Room → Chat
+- CodeBlock input with 8-slot auto-advance FocusNode chain
+- Chat composer with local send (dummy, no network)
+- Replaced ComponentGalleryScreen with HomeScreen as app entry point
+- flutter analyze — clean
+- flutter test — 1/1 passed
+
+### Branch
+task/screens
+
+### Status
+Done

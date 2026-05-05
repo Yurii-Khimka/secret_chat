@@ -4,6 +4,15 @@ _Most recent changes appear at the top._
 
 ---
 
+## 2026-05-05 — Four screens + navigation
+
+- Built 4 screens: HomeScreen, RoomCreatedScreen, JoinRoomScreen, ChatScreen
+- Full navigation: Home → RoomCreated (push) → Chat (replace), Home → JoinRoom (push) → Chat (replace), Chat → Home (popUntil first)
+- CodeBlock input with 8-slot auto-advance, clipboard copy on RoomCreated, dummy chat send
+- Replaced ComponentGalleryScreen with HomeScreen as app entry; gallery preserved in lib/dev/
+- Branch: task/screens
+- Commit: feat: home, room created, join room, and chat screens with navigation
+
 ## 2026-05-05 — Component library + dev gallery
 
 - Built 8 components in lib/components/: AppScaffold, AppButton, AppTextField, AppText, MessageBubble, RoomCodeDisplay, PulseDot, SystemMessage

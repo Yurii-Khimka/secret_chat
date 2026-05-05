@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'theme/theme_controller.dart';
-import 'dev/component_gallery_screen.dart';
+import 'screens/home_screen.dart';
 
 final _themeController = ThemeController();
 
@@ -22,10 +22,7 @@ class SecretChatApp extends StatelessWidget {
         return MaterialApp(
           title: 'Secret Chat',
           debugShowCheckedModeBanner: false,
-          home: ComponentGalleryScreen(
-            theme: theme,
-            controller: _themeController,
-          ),
+          home: HomeScreen(theme: theme),
         );
       },
     );

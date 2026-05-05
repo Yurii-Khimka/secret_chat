@@ -1,67 +1,90 @@
 # Last Task Result
 
 ## Task
-Component library and dev-only Component Gallery (Task 3 of 5).
+Build the four production screens and wire navigation (Task 4 of 5).
 
 ## Branch
-task/component-library
+task/screens
 
 ## Commit
-feat: component library and dev component gallery
+feat: home, room created, join room, and chat screens with navigation
 
 ## What Was Done
 
 ### File tree under lib/
 ```
 lib/
-├── main.dart                                (wires ComponentGalleryScreen)
+├── main.dart                                (MODIFIED — wires HomeScreen)
 ├── tokens/
 │   └── tokens.dart
 ├── theme/
 │   ├── app_theme.dart
 │   ├── app_theme_name.dart
 │   ├── theme_controller.dart
-│   └── palettes/
-│       ├── mint_palette.dart
-│       ├── ice_palette.dart
-│       ├── indigo_palette.dart
-│       ├── sand_palette.dart
-│       └── lime_palette.dart
+│   └── palettes/ (5 files)
 ├── components/
-│   ├── app_scaffold.dart                    (NEW)
-│   ├── app_button.dart                      (NEW)
-│   ├── app_text_field.dart                  (NEW)
-│   ├── app_text.dart                        (NEW)
-│   ├── message_bubble.dart                  (NEW)
-│   ├── room_code_display.dart               (NEW)
-│   ├── pulse_dot.dart                       (NEW — extra)
-│   └── system_message.dart                  (NEW — extra)
+│   ├── app_scaffold.dart
+│   ├── app_button.dart
+│   ├── app_text_field.dart
+│   ├── app_text.dart
+│   ├── message_bubble.dart
+│   ├── room_code_display.dart
+│   ├── pulse_dot.dart
+│   └── system_message.dart
+├── screens/
+│   ├── home_screen.dart                     (NEW)
+│   ├── room_created_screen.dart             (NEW)
+│   ├── join_room_screen.dart                (NEW)
+│   └── chat_screen.dart                     (NEW)
 └── dev/
-    └── component_gallery_screen.dart        (NEW)
+    └── component_gallery_screen.dart        (preserved)
 ```
 
-### Components built
+### Screen → component mapping
 
-1. **AppScaffold** — Scaffold wrapper with palette background, safe areas, optional top/bottom bar slots
-2. **AppButton** — Variants: `primary`, `secondary`. Props: `label`, `onPressed`, `variant`, `enabled`, `expand`, `sub`. 56px min height, accent glow shadow on primary
-3. **AppTextField** — Focus-managed input with palette-driven border highlight. Props: `controller`, `placeholder`, `label`, `obscure`, `monospace`, `autoFocus`, `onChanged`, `prefixChar`, `trailingText`
-4. **AppText** — Variants: `heading`, `body`, `mono`, `caption`. Props: `text`, `variant`, `color`, `align`
-5. **MessageBubble** — Directions: `sent`, `received`. Asymmetric border radii from design. Props: `text`, `direction`, `senderLabel`
-6. **RoomCodeDisplay** — Large phosphor-glow code with gradient surface. Props: `code`, `onCopy`
+**HomeScreen**
+- Components used: `AppScaffold`, `AppButton` (primary + secondary), `PulseDot`
+- Inline: TermHeader (AppTypography + PulseDot row), DiagCard (Container with _DiagRow entries), `_generateFakeRoomCode()` helper
 
-### Extra components added
+**RoomCreatedScreen**
+- Components used: `AppScaffold`, `AppButton`, `RoomCodeDisplay`, `SystemMessage`, `PulseDot`
+- Inline: TermHeader with back chevron, _StepRow (numbered step list from design), clipboard copy with 1.5s transient "code copied" message
 
-- **PulseDot** — Animated pulse indicator (screens.jsx `Pulse` component). Used in TermHeader and ChatScreen as live status signal. Repeating scale+opacity animation at 1.6s.
-- **SystemMessage** — Centered system/status text (screens.jsx chat "— session opened —"). Used between message bubbles for session events.
+**JoinRoomScreen**
+- Components used: `AppScaffold`, `AppButton`, `AppTextField` (×2: nickname + password)
+- Inline: TermHeader with "‹ BACK / JOIN", CodeBlock (8 single-char TextFields with auto-advance/retreat FocusNode chain)
 
-### Design elements NOT built as components yet
+**ChatScreen**
+- Components used: `AppScaffold` (topBar + body), `MessageBubble`, `SystemMessage`, `PulseDot`
+- Inline: TermHeader with room code + ENCRYPTED badge, message composer row (TextField + SEND pill), dummy seed messages
 
-- **CodeBlock** (segmented 4-slot code input on Join screen) — complex interactive input, better built directly in JoinRoomScreen (Task 4)
-- **FakeKeyboard** — design-only mock keyboard, not needed in Flutter (OS provides real keyboard)
-- **TermHeader** — screen-specific header bar; will be composed per-screen in Task 4 using AppScaffold's topBar slot
-- **DiagCard** (diagnostics on Home screen) — small enough to inline in HomeScreen (Task 4)
-- **Step** (numbered steps on Room Created screen) — simple row, not component-grade; inline in Task 4
-- **Card** wrapper — trivial Container with border/radius, used via BoxDecoration directly
+### Navigation graph
+```
+         HomeScreen
+        /          \
+  [Create Room]   [Join Room]
+       |               |
+  RoomCreatedScreen  JoinRoomScreen
+       |               |
+  [Open Chat]       [Connect]
+   (replace)        (replace)
+       \              /
+        ChatScreen
+            |
+       [‹ back]
+      popUntil(first)
+            |
+        HomeScreen
+```
+
+### Seed messages in ChatScreen
+1. `— session opened —` (system)
+2. `peer joined · key verified ✓` (system)
+3. `are you there` (received, PEER)
+4. `yes. line is clean.` (sent, YOU)
+5. `good. send the doc reference.` (received, PEER)
+6. `check your earlier note.\nfourth paragraph, second line.` (sent, YOU)
+7. `got it.` (received, PEER)
 
 ### Verification
 - `flutter analyze` — No issues found
@@ -71,6 +94,8 @@ lib/
 Done
 
 ## Notes
-- PulseDot uses infinite animation — widget test uses `pump()` instead of `pumpAndSettle()` to avoid timeout
-- All components read exclusively from AppPalette/AppTypography/AppSpacing/AppRadii — zero hardcoded values
-- Gallery shows all components with multiple states (enabled/disabled, filled/empty, sent/received, etc.)
+- RoomCreatedScreen and JoinRoomScreen use `pushReplacement` to ChatScreen so back from Chat goes to Home
+- ChatScreen back button uses `popUntil(route.isFirst)` to return to Home
+- CodeBlock input: 8 slots (4+4), auto-advance on character entry, auto-retreat on backspace
+- Send button appends local sent bubble + clears field; no network
+- ComponentGalleryScreen preserved in lib/dev/ — not deleted
