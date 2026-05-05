@@ -4,6 +4,16 @@ _Most recent changes appear at the top._
 
 ---
 
+## 2026-05-05 — WebSocket + optional TLS
+
+- Added `ws@^8` (sole runtime dep); refactored server into server.js + ws.js
+- WebSocket endpoint on configurable path (default `/ws`), sends hello frame on connect
+- Optional TLS via `TLS_CERT_PATH` + `TLS_KEY_PATH` env vars
+- Heartbeat ping/pong every 30s, terminates stale clients
+- No client data logged — hard rule comment at ws.js:1-6
+- Branch: task/server-websocket-tls
+- Commit: feat: websocket endpoint with optional TLS and hello frame
+
 ## 2026-05-05 — Node.js server skeleton
 
 - Created `server/` directory with HTTP server, /health endpoint, config, and logger
