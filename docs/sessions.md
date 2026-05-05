@@ -18,7 +18,7 @@
 - [x] WebSocket connection + TLS
 - [x] Room creation (server-side code generation, in-memory only)
 - [x] Room join flow (peer pairing by code)
-- [ ] Real-time message relay (encrypted payload pass-through, server cannot read)
+- [x] Real-time message relay (encrypted payload pass-through, server cannot read)
 - [ ] Connection lifecycle + cleanup on disconnect
 
 ### Phase 2 — Security
@@ -206,6 +206,24 @@ Done
 
 ### Branch
 task/server-room-join
+
+### Status
+Done
+
+---
+
+## Session 2026-05-05 — Encrypted-payload relay (opaque)
+
+### Completed
+- Added `msg` message type for opaque-payload relay between paired peers
+- Server forwards payload verbatim — zero logging on relay path
+- Added `getPeer(ws)` helper, `not_in_room` / `not_paired` error codes
+- Raised frame cap to 16 KB
+- 8 relay tests (27 total), all pass
+- flutter analyze + flutter test still clean
+
+### Branch
+task/server-relay
 
 ### Status
 Done

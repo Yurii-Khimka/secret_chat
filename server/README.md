@@ -46,9 +46,18 @@ v0.1 — will grow.
 | `joined` | server → joiner | `{type:"joined", code:"WORD-NNNN"}` |
 | `peer_joined` | server → creator | `{type:"peer_joined"}` |
 | `peer_left` | server → survivor | `{type:"peer_left"}` |
+| `msg` | bidirectional | `{type:"msg", payload:"<opaque string>"}` |
 | `error` | server → client | `{type:"error", code:"<slug>", reason:"<fixed string>"}` |
 
 Pairing is 1:1. Either party leaving destroys the room.
+
+Frame cap: 16 KB per message.
+
+### Relay invariants
+
+- Server forwards `payload` verbatim. No decode, no transform, no inspection.
+- Server does not log `msg` frames in any form.
+- Server stores nothing about the conversation beyond the ws-to-room binding.
 
 ## Logging policy
 
@@ -60,4 +69,4 @@ TLS is not exercised by `npm test` yet — generating a self-signed cert in CI a
 
 ## Status
 
-Connections + room creation + 1:1 pairing. No relay, no encryption yet.
+Connections + room creation + 1:1 pairing + opaque-payload relay. No encryption yet — payload is whatever the client sends.

@@ -4,6 +4,17 @@ _Most recent changes appear at the top._
 
 ---
 
+## 2026-05-05 — Opaque-payload message relay
+
+- Added `msg` message type for bidirectional relay between paired peers
+- Server forwards `payload` verbatim — no decode, no transform, no inspection, no logging
+- Added `getPeer(ws)` helper in rooms.js (state-reading only)
+- New error codes: `not_in_room`, `not_paired`
+- Raised `MAX_FRAME_SIZE` from 1 KB to 16 KB (fits AES-256-GCM ciphertext + base64)
+- 8 relay tests added (27 total)
+- Branch: task/server-relay
+- Commit: feat: opaque-payload message relay between paired peers
+
 ## 2026-05-05 — Room join + peer pairing
 
 - Extended protocol with join_room, joined, peer_joined, peer_left message types

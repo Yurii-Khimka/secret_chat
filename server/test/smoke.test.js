@@ -307,6 +307,117 @@ describe('secret-chat-server', { concurrency: false }, () => {
     await closeWs(b);
   });
 
+  // Relay tests
+  describe('Relay', () => {
+    async function createPair() {
+      const a = await connect();
+      await nextMessage(a); // hello
+      a.send(JSON.stringify({ type: 'create_room' }));
+      const created = await nextMessage(a);
+      const code = created.code;
+
+      const b = await connect();
+      await nextMessage(b); // hello
+      b.send(JSON.stringify({ type: 'join_room', code }));
+      await nextMessage(b); // joined
+      await nextMessage(a); // peer_joined
+      return { a, b, code };
+    }
+
+    test('A → B relay', async () => {
+      const { a, b } = await createPair();
+      a.send(JSON.stringify({ type: 'msg', payload: 'hello-from-a' }));
+      const msg = await nextMessage(b);
+      assert.deepEqual(msg, { type: 'msg', payload: 'hello-from-a' });
+      await closeWs(b);
+      await new Promise((r) => setTimeout(r, 50));
+      await closeWs(a);
+    });
+
+    test('B → A relay', async () => {
+      const { a, b } = await createPair();
+      b.send(JSON.stringify({ type: 'msg', payload: 'hello-from-b' }));
+      const msg = await nextMessage(a);
+      assert.deepEqual(msg, { type: 'msg', payload: 'hello-from-b' });
+      await closeWs(b);
+      await new Promise((r) => setTimeout(r, 50));
+      await closeWs(a);
+    });
+
+    test('sender not in a room → not_in_room', async () => {
+      const ws = await connect();
+      await nextMessage(ws); // hello
+      ws.send(JSON.stringify({ type: 'msg', payload: 'test' }));
+      const msg = await nextMessage(ws);
+      assert.equal(msg.type, 'error');
+      assert.equal(msg.code, 'not_in_room');
+      await closeWs(ws);
+    });
+
+    test('sender unpaired → not_paired', async () => {
+      const a = await connect();
+      await nextMessage(a); // hello
+      a.send(JSON.stringify({ type: 'create_room' }));
+      await nextMessage(a); // room_created
+      a.send(JSON.stringify({ type: 'msg', payload: 'test' }));
+      const msg = await nextMessage(a);
+      assert.equal(msg.type, 'error');
+      assert.equal(msg.code, 'not_paired');
+      await closeWs(a);
+    });
+
+    test('missing payload → bad_message', async () => {
+      const { a, b } = await createPair();
+      a.send(JSON.stringify({ type: 'msg' }));
+      const msg = await nextMessage(a);
+      assert.equal(msg.type, 'error');
+      assert.equal(msg.code, 'bad_message');
+      await closeWs(b);
+      await new Promise((r) => setTimeout(r, 50));
+      await closeWs(a);
+    });
+
+    test('non-string payload → bad_message', async () => {
+      const { a, b } = await createPair();
+      a.send(JSON.stringify({ type: 'msg', payload: 123 }));
+      const msg = await nextMessage(a);
+      assert.equal(msg.type, 'error');
+      assert.equal(msg.code, 'bad_message');
+      await closeWs(b);
+      await new Promise((r) => setTimeout(r, 50));
+      await closeWs(a);
+    });
+
+    test('oversized frame → bad_message, peer receives nothing', async () => {
+      const { a, b } = await createPair();
+      // Build a frame larger than 16 KB
+      const bigPayload = 'x'.repeat(16 * 1024 + 1);
+      a.send(JSON.stringify({ type: 'msg', payload: bigPayload }));
+      const msg = await nextMessage(a);
+      assert.equal(msg.type, 'error');
+      assert.equal(msg.code, 'bad_message');
+      // B should not have received anything — send a known msg to verify
+      b.send(JSON.stringify({ type: 'msg', payload: 'check' }));
+      const check = await nextMessage(a);
+      assert.deepEqual(check, { type: 'msg', payload: 'check' });
+      await closeWs(b);
+      await new Promise((r) => setTimeout(r, 50));
+      await closeWs(a);
+    });
+
+    test('server does not modify payload (special chars)', async () => {
+      const { a, b } = await createPair();
+      const special = 'a"b\\cé';
+      a.send(JSON.stringify({ type: 'msg', payload: special }));
+      const msg = await nextMessage(b);
+      assert.equal(msg.type, 'msg');
+      assert.equal(msg.payload, special);
+      await closeWs(b);
+      await new Promise((r) => setTimeout(r, 50));
+      await closeWs(a);
+    });
+  });
+
   // Shutdown test (last)
   test('server closes cleanly with open ws client', async () => {
     const ws = await connect();
