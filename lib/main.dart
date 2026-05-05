@@ -37,7 +37,8 @@ class _SecretChatAppState extends State<SecretChatApp> with WidgetsBindingObserv
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.detached || state == AppLifecycleState.paused) {
+    // paused = backgrounded, room survives. detached = process going away, drop everything.
+    if (state == AppLifecycleState.detached) {
       widget.chatClient.close();
     }
   }

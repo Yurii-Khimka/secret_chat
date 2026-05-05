@@ -4,6 +4,15 @@ _Most recent changes appear at the top._
 
 ---
 
+## 2026-05-05 — Task 7b: live verification + UX closeout
+
+- PASSWORD field on JoinRoomScreen: added `// password gate arrives in task 8` helper text (muted)
+- Lifecycle: removed `paused` trigger from `chatClient.close()` — only `detached` now
+- ChatScreen: added `[plaintext — encryption arrives in task 9]` warning banner (extended `SystemMessage` with `tone: warning`)
+- J.1–J.7 manual verification: blocked (no simulator in this environment)
+- Branch: task/flutter-network-client (same branch, no merge)
+- Commit: fix: live verification + ux closeout for flutter network client
+
 ## 2026-05-05 — Flutter WebSocket client + real pairing
 
 - Added `web_socket_channel ^3.0.0`; created `lib/network/` with server_config, protocol (sealed classes), chat_client (ChangeNotifier)

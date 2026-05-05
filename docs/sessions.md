@@ -270,3 +270,23 @@ task/flutter-network-client
 
 ### Status
 Done
+
+---
+
+## Session 2026-05-05 — Task 7b — live verification + UX closeout
+
+### Completed
+- PASSWORD field: added `// password gate arrives in task 8` helper text below the field
+- Lifecycle: removed `paused` branch — only `detached` triggers `chatClient.close()`
+- ChatScreen: added plaintext warning banner via extended `SystemMessage` (tone: warning)
+- Extended `SystemMessage` with `SystemMessageTone` enum (muted/warning) — no new component
+- flutter analyze clean, flutter test 19/19, npm test 29/29
+
+### Blocked
+- J.3–J.7 manual verification requires a running simulator — not available in this environment
+
+### Branch
+task/flutter-network-client
+
+### Status
+Partially done — UX fixes complete, manual verification blocked

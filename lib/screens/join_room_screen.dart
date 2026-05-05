@@ -250,6 +250,11 @@ class _JoinRoomScreenState extends State<JoinRoomScreen> {
                       prefixChar: '\$',
                       trailingText: 'SHA-256 ▸ AES-256',
                     ),
+                    const SizedBox(height: AppSpacing.sm),
+                    Text(
+                      '// password gate arrives in task 8',
+                      style: AppTypography.caption.copyWith(color: p.textMuted),
+                    ),
                   ],
                 ),
               ),

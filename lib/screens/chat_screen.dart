@@ -154,6 +154,11 @@ class _ChatScreenState extends State<ChatScreen> {
         behavior: HitTestBehavior.translucent,
         child: Column(
           children: [
+            SystemMessage(
+              text: '[plaintext — encryption arrives in task 9]',
+              palette: p,
+              tone: SystemMessageTone.warning,
+            ),
             Expanded(
               child: ListView.builder(
                 controller: _scrollController,
