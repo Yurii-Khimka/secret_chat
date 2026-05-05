@@ -1,101 +1,76 @@
 # Last Task Result
 
 ## Task
-Build the four production screens and wire navigation (Task 4 of 5).
+Settings screen with theme picker and persistence verification (Task 5 of 5).
 
 ## Branch
-task/screens
+task/settings-and-theme-picker
 
 ## Commit
-feat: home, room created, join room, and chat screens with navigation
+feat: settings screen with theme picker and persistence verification
 
 ## What Was Done
 
-### File tree under lib/
+### File tree — created or modified
 ```
 lib/
-├── main.dart                                (MODIFIED — wires HomeScreen)
-├── tokens/
-│   └── tokens.dart
-├── theme/
-│   ├── app_theme.dart
-│   ├── app_theme_name.dart
-│   ├── theme_controller.dart
-│   └── palettes/ (5 files)
-├── components/
-│   ├── app_scaffold.dart
-│   ├── app_button.dart
-│   ├── app_text_field.dart
-│   ├── app_text.dart
-│   ├── message_bubble.dart
-│   ├── room_code_display.dart
-│   ├── pulse_dot.dart
-│   └── system_message.dart
+├── main.dart                                (MODIFIED — controller now injectable)
 ├── screens/
-│   ├── home_screen.dart                     (NEW)
-│   ├── room_created_screen.dart             (NEW)
-│   ├── join_room_screen.dart                (NEW)
-│   └── chat_screen.dart                     (NEW)
+│   ├── home_screen.dart                     (MODIFIED — added ⚙ SETTINGS entry + controller prop)
+│   └── settings_screen.dart                 (NEW)
 └── dev/
-    └── component_gallery_screen.dart        (preserved)
+    └── component_gallery_screen.dart        (preserved, reachable from Settings in debug)
+
+test/
+├── widget_test.dart                         (MODIFIED — passes controller)
+└── theme_persistence_test.dart              (NEW — 3 tests)
 ```
 
-### Screen → component mapping
+### SettingsScreen layout
+Each theme row: 10px accent circle swatch → theme name (mono uppercase) → `›` marker if active. 44px min height, highlight border + accentGhost fill on active row.
 
-**HomeScreen**
-- Components used: `AppScaffold`, `AppButton` (primary + secondary), `PulseDot`
-- Inline: TermHeader (AppTypography + PulseDot row), DiagCard (Container with _DiagRow entries), `_generateFakeRoomCode()` helper
+### Developer section gating
+`kDebugMode` check at `lib/screens/settings_screen.dart:82`. The Developer section (with COMPONENT GALLERY link) is only rendered when `kDebugMode == true`. In release builds it is completely absent.
 
-**RoomCreatedScreen**
-- Components used: `AppScaffold`, `AppButton`, `RoomCodeDisplay`, `SystemMessage`, `PulseDot`
-- Inline: TermHeader with back chevron, _StepRow (numbered step list from design), clipboard copy with 1.5s transient "code copied" message
+### Three new persistence tests
 
-**JoinRoomScreen**
-- Components used: `AppScaffold`, `AppButton`, `AppTextField` (×2: nickname + password)
-- Inline: TermHeader with "‹ BACK / JOIN", CodeBlock (8 single-char TextFields with auto-advance/retreat FocusNode chain)
+1. **`cold start loads Lime when persisted`** — Sets `{'app.theme': 'lime'}` in SharedPreferences mock, loads controller, asserts accent == Lime's accent hex (`0xFFC8F08A`)
+2. **`cold start falls back to Mint when empty`** — Sets empty SharedPreferences, loads controller, asserts accent == Mint's accent hex (`0xFF7FE0A3`)
+3. **`tapping Indigo in Settings persists choice`** — Pumps app, taps ⚙ SETTINGS, taps INDIGO row, asserts `controller.current == AppThemeName.indigo`, asserts `SharedPreferences.getString('app.theme') == 'indigo'`
 
-**ChatScreen**
-- Components used: `AppScaffold` (topBar + body), `MessageBubble`, `SystemMessage`, `PulseDot`
-- Inline: TermHeader with room code + ENCRYPTED badge, message composer row (TextField + SEND pill), dummy seed messages
-
-### Navigation graph
+### Final navigation graph
 ```
-         HomeScreen
-        /          \
-  [Create Room]   [Join Room]
-       |               |
-  RoomCreatedScreen  JoinRoomScreen
-       |               |
-  [Open Chat]       [Connect]
-   (replace)        (replace)
-       \              /
-        ChatScreen
-            |
-       [‹ back]
-      popUntil(first)
-            |
-        HomeScreen
+              HomeScreen
+           /      |       \
+    [Create]   [Join]   [⚙ SETTINGS]
+       |          |          |
+  RoomCreated  JoinRoom  SettingsScreen
+       |          |       /        \
+  [Open Chat]  [Connect] [theme]  [GALLERY] (debug only)
+   (replace)   (replace)    |         |
+       \         /          |    ComponentGalleryScreen
+        ChatScreen          |
+            |            (pop)
+       [‹ back]             |
+      popUntil(first)       |
+            |               |
+         HomeScreen ←───────┘
 ```
-
-### Seed messages in ChatScreen
-1. `— session opened —` (system)
-2. `peer joined · key verified ✓` (system)
-3. `are you there` (received, PEER)
-4. `yes. line is clean.` (sent, YOU)
-5. `good. send the doc reference.` (received, PEER)
-6. `check your earlier note.\nfourth paragraph, second line.` (sent, YOU)
-7. `got it.` (received, PEER)
 
 ### Verification
 - `flutter analyze` — No issues found
-- `flutter test` — All tests passed (1/1)
+- `flutter test` — All tests passed (4/4: 1 smoke + 3 persistence)
+
+### Manual verification
+- SettingsScreen shows 5 theme rows (Mint, Ice, Indigo, Sand, Lime) in enum order ✓
+- Default theme is Mint (AppThemeName.defaultTheme) ✓
+- Developer section gated behind `kDebugMode` at settings_screen.dart:82 ✓
 
 ## Status
 Done
 
 ## Notes
-- RoomCreatedScreen and JoinRoomScreen use `pushReplacement` to ChatScreen so back from Chat goes to Home
-- ChatScreen back button uses `popUntil(route.isFirst)` to return to Home
-- CodeBlock input: 8 slots (4+4), auto-advance on character entry, auto-retreat on backspace
-- Send button appends local sent bubble + clears field; no network
-- ComponentGalleryScreen preserved in lib/dev/ — not deleted
+- `SecretChatApp` now accepts a required `controller` parameter for testability
+- `themeController` in main.dart changed from private `_themeController` to public `themeController` for test access
+- ComponentGalleryScreen preserved in lib/dev/, reachable only via Settings → Developer (debug builds)
+- 5-task plan complete — ready for Phase 1 networking

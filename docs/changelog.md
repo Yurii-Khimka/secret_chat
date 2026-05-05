@@ -4,6 +4,16 @@ _Most recent changes appear at the top._
 
 ---
 
+## 2026-05-05 — Settings screen + theme picker + persistence tests
+
+- Built SettingsScreen with 5 theme rows (accent swatch + name + active marker) and kDebugMode-gated Developer section
+- Added ⚙ SETTINGS entry point to HomeScreen top bar
+- Made SecretChatApp controller injectable for testability
+- Added 3 end-to-end persistence tests: cold-start with stored theme, default fallback, and runtime persist via Settings UI
+- Branch: task/settings-and-theme-picker
+- Commit: feat: settings screen with theme picker and persistence verification
+- 5-task plan complete — ready for Phase 1 networking
+
 ## 2026-05-05 — Four screens + navigation
 
 - Built 4 screens: HomeScreen, RoomCreatedScreen, JoinRoomScreen, ChatScreen

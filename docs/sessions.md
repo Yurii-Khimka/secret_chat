@@ -83,3 +83,21 @@ task/screens
 
 ### Status
 Done
+
+---
+
+## Session 2026-05-05 — Settings screen + theme picker + persistence tests
+
+### Completed
+- Built SettingsScreen with 5 theme rows and developer section (kDebugMode gated)
+- Added ⚙ SETTINGS entry point to HomeScreen top bar
+- Made SecretChatApp controller injectable for testing
+- Added 3 persistence tests: cold-start Lime, cold-start Mint fallback, runtime Indigo persist
+- flutter analyze — clean
+- flutter test — 4/4 passed
+
+### Branch
+task/settings-and-theme-picker
+
+### Status
+Done

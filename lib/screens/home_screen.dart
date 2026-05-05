@@ -4,14 +4,17 @@ import '../tokens/tokens.dart';
 import '../theme/app_theme.dart';
 import '../components/app_scaffold.dart';
 import '../components/app_button.dart';
+import '../theme/theme_controller.dart';
 import '../components/pulse_dot.dart';
 import 'room_created_screen.dart';
 import 'join_room_screen.dart';
+import 'settings_screen.dart';
 
 class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key, required this.theme});
+  const HomeScreen({super.key, required this.theme, required this.controller});
 
   final AppTheme theme;
+  final ThemeController controller;
 
   @override
   Widget build(BuildContext context) {
@@ -40,9 +43,21 @@ class HomeScreen extends StatelessWidget {
                       ),
                     ],
                   ),
-                  Text(
-                    'OFFLINE • E2EE',
-                    style: AppTypography.caption.copyWith(color: p.textMuted),
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => SettingsScreen(
+                            theme: theme,
+                            controller: controller,
+                          ),
+                        ),
+                      );
+                    },
+                    child: Text(
+                      '⚙ SETTINGS',
+                      style: AppTypography.caption.copyWith(color: p.textMuted),
+                    ),
                   ),
                 ],
               ),

@@ -2,27 +2,29 @@ import 'package:flutter/material.dart';
 import 'theme/theme_controller.dart';
 import 'screens/home_screen.dart';
 
-final _themeController = ThemeController();
+final themeController = ThemeController();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await _themeController.load();
-  runApp(const SecretChatApp());
+  await themeController.load();
+  runApp(SecretChatApp(controller: themeController));
 }
 
 class SecretChatApp extends StatelessWidget {
-  const SecretChatApp({super.key});
+  const SecretChatApp({super.key, required this.controller});
+
+  final ThemeController controller;
 
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: _themeController,
+      animation: controller,
       builder: (context, _) {
-        final theme = _themeController.theme;
+        final theme = controller.theme;
         return MaterialApp(
           title: 'Secret Chat',
           debugShowCheckedModeBanner: false,
-          home: HomeScreen(theme: theme),
+          home: HomeScreen(theme: theme, controller: controller),
         );
       },
     );
