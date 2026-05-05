@@ -10,6 +10,8 @@ class AppTextField extends StatefulWidget {
     this.obscure = false,
     this.monospace = true,
     this.autoFocus = false,
+    this.enabled = true,
+    this.maxLength,
     this.onChanged,
     required this.palette,
     this.prefixChar,
@@ -22,6 +24,8 @@ class AppTextField extends StatefulWidget {
   final bool obscure;
   final bool monospace;
   final bool autoFocus;
+  final bool enabled;
+  final int? maxLength;
   final ValueChanged<String>? onChanged;
   final AppPalette palette;
   final String? prefixChar;
@@ -94,8 +98,10 @@ class _AppTextFieldState extends State<AppTextField> {
                   focusNode: _focusNode,
                   autofocus: widget.autoFocus,
                   obscureText: widget.obscure,
+                  enabled: widget.enabled,
+                  maxLength: widget.maxLength,
                   onChanged: widget.onChanged,
-                  style: textStyle.copyWith(color: p.textPrimary),
+                  style: textStyle.copyWith(color: widget.enabled ? p.textPrimary : p.textMuted),
                   cursorColor: p.accent,
                   cursorWidth: 8,
                   cursorHeight: 14,
@@ -103,6 +109,7 @@ class _AppTextFieldState extends State<AppTextField> {
                     isDense: true,
                     contentPadding: EdgeInsets.zero,
                     border: InputBorder.none,
+                    counterText: '',
                     hintText: widget.placeholder,
                     hintStyle: textStyle.copyWith(color: p.textMuted),
                   ),

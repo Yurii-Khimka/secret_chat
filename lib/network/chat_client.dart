@@ -17,6 +17,7 @@ class ChatClient extends ChangeNotifier {
   ChatConnectionState _state = ChatConnectionState.idle;
   String? _roomCode;
   String? _lastError;
+  bool _passwordMode = false;
   final List<IncomingMessage> _messages = [];
 
   WebSocketChannel? _channel;
@@ -25,6 +26,7 @@ class ChatClient extends ChangeNotifier {
   ChatConnectionState get state => _state;
   String? get roomCode => _roomCode;
   String? get lastError => _lastError;
+  bool get passwordMode => _passwordMode;
   List<IncomingMessage> get messages => List.unmodifiable(_messages);
 
   void _setState(ChatConnectionState s) {
@@ -61,9 +63,11 @@ class ChatClient extends ChangeNotifier {
         if (kDebugMode) debugPrint('[chat] connected');
       case RoomCreatedMsg():
         _roomCode = msg.code;
+        _passwordMode = msg.passwordMode;
         _setState(ChatConnectionState.connected);
       case JoinedMsg():
         _roomCode = msg.code;
+        _passwordMode = msg.passwordMode;
         _setState(ChatConnectionState.paired);
       case PeerJoinedMsg():
         _setState(ChatConnectionState.paired);
@@ -95,11 +99,11 @@ class ChatClient extends ChangeNotifier {
     _setState(ChatConnectionState.closed);
   }
 
-  Future<void> createRoom() async {
+  Future<void> createRoom({bool passwordMode = false}) async {
     _lastError = null;
     await _connect();
     if (_state == ChatConnectionState.error) return;
-    _channel?.sink.add(createRoomFrame());
+    _channel?.sink.add(createRoomFrame(passwordMode: passwordMode));
   }
 
   Future<void> joinRoom(String code) async {
@@ -133,6 +137,7 @@ class ChatClient extends ChangeNotifier {
     _subscription = null;
     _roomCode = null;
     _lastError = null;
+    _passwordMode = false;
     _messages.clear();
     _state = ChatConnectionState.idle;
     try {

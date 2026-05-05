@@ -155,7 +155,9 @@ class _ChatScreenState extends State<ChatScreen> {
         child: Column(
           children: [
             SystemMessage(
-              text: '[plaintext — encryption arrives in task 9]',
+              text: widget.chatClient.passwordMode
+                  ? '// phrase mode\nthis room requires a shared phrase. type the phrase you agreed on\nwith the other participant as your first message. it acts as the\nencryption key — messages will be unreadable without an exact\ncase-sensitive match. (encryption arrives in task 9)'
+                  : '[plaintext — encryption arrives in task 9]',
               palette: p,
               tone: SystemMessageTone.warning,
             ),

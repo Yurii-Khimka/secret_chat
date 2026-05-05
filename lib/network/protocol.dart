@@ -23,13 +23,15 @@ class HelloMsg extends ServerMessage {
 }
 
 class RoomCreatedMsg extends ServerMessage {
-  RoomCreatedMsg(this.code);
+  RoomCreatedMsg(this.code, this.passwordMode);
   final String code;
+  final bool passwordMode;
 }
 
 class JoinedMsg extends ServerMessage {
-  JoinedMsg(this.code);
+  JoinedMsg(this.code, this.passwordMode);
   final String code;
+  final bool passwordMode;
 }
 
 class PeerJoinedMsg extends ServerMessage {}
@@ -60,8 +62,12 @@ ServerMessage? parseFrame(String raw) {
 
   return switch (type) {
     kHello => HelloMsg(parsed['v'] as String? ?? ''),
-    kRoomCreated => parsed['code'] is String ? RoomCreatedMsg(parsed['code'] as String) : null,
-    kJoined => parsed['code'] is String ? JoinedMsg(parsed['code'] as String) : null,
+    kRoomCreated => parsed['code'] is String
+        ? RoomCreatedMsg(parsed['code'] as String, parsed['password_mode'] as bool? ?? false)
+        : null,
+    kJoined => parsed['code'] is String
+        ? JoinedMsg(parsed['code'] as String, parsed['password_mode'] as bool? ?? false)
+        : null,
     kPeerJoined => PeerJoinedMsg(),
     kPeerLeft => PeerLeftMsg(),
     kMsg => parsed['payload'] is String ? MsgMsg(parsed['payload'] as String) : null,
@@ -75,7 +81,8 @@ ServerMessage? parseFrame(String raw) {
 
 // ── Outbound (client → server) ─────────────────────────────────
 
-String createRoomFrame() => jsonEncode({'type': kCreateRoom});
+String createRoomFrame({bool passwordMode = false}) =>
+    jsonEncode({'type': kCreateRoom, 'password_mode': passwordMode});
 
 String joinRoomFrame(String code) => jsonEncode({'type': kJoinRoom, 'code': code});
 

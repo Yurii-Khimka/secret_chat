@@ -13,13 +13,29 @@ void main() {
     test('parses room_created', () {
       final msg = parseFrame('{"type":"room_created","code":"WOLF-1234"}');
       expect(msg, isA<RoomCreatedMsg>());
-      expect((msg as RoomCreatedMsg).code, 'WOLF-1234');
+      final rc = msg as RoomCreatedMsg;
+      expect(rc.code, 'WOLF-1234');
+      expect(rc.passwordMode, false);
+    });
+
+    test('parses room_created with password_mode true', () {
+      final msg = parseFrame('{"type":"room_created","code":"WOLF-1234","password_mode":true}');
+      expect(msg, isA<RoomCreatedMsg>());
+      expect((msg as RoomCreatedMsg).passwordMode, true);
     });
 
     test('parses joined', () {
       final msg = parseFrame('{"type":"joined","code":"BEAR-5678"}');
       expect(msg, isA<JoinedMsg>());
-      expect((msg as JoinedMsg).code, 'BEAR-5678');
+      final j = msg as JoinedMsg;
+      expect(j.code, 'BEAR-5678');
+      expect(j.passwordMode, false);
+    });
+
+    test('parses joined with password_mode true', () {
+      final msg = parseFrame('{"type":"joined","code":"BEAR-5678","password_mode":true}');
+      expect(msg, isA<JoinedMsg>());
+      expect((msg as JoinedMsg).passwordMode, true);
     });
 
     test('parses peer_joined', () {
@@ -65,9 +81,16 @@ void main() {
   });
 
   group('outbound builders', () {
-    test('createRoomFrame', () {
+    test('createRoomFrame default', () {
       final parsed = jsonDecode(createRoomFrame());
       expect(parsed['type'], 'create_room');
+      expect(parsed['password_mode'], false);
+    });
+
+    test('createRoomFrame with passwordMode true', () {
+      final parsed = jsonDecode(createRoomFrame(passwordMode: true));
+      expect(parsed['type'], 'create_room');
+      expect(parsed['password_mode'], true);
     });
 
     test('joinRoomFrame', () {

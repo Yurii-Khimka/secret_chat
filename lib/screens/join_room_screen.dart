@@ -24,7 +24,6 @@ class _JoinRoomScreenState extends State<JoinRoomScreen> {
   final List<FocusNode> _codeFocusNodes = List.generate(8, (_) => FocusNode());
 
   final _nicknameController = TextEditingController();
-  final _passwordController = TextEditingController();
 
   bool _connecting = false;
   String? _error;
@@ -39,7 +38,6 @@ class _JoinRoomScreenState extends State<JoinRoomScreen> {
       f.dispose();
     }
     _nicknameController.dispose();
-    _passwordController.dispose();
     super.dispose();
   }
 
@@ -109,7 +107,6 @@ class _JoinRoomScreenState extends State<JoinRoomScreen> {
   }
 
   Future<void> _connect() async {
-    // TODO(task-8): wire password to Argon2
     setState(() {
       _connecting = true;
       _error = null;
@@ -226,33 +223,10 @@ class _JoinRoomScreenState extends State<JoinRoomScreen> {
                       ),
                     ),
 
-                    // ── Password ─────────────────────────
+                    // ── Password mode info ──────────────
                     const SizedBox(height: AppSpacing.xl),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          '// PASSWORD (OPTIONAL)',
-                          style: AppTypography.caption.copyWith(color: p.textMuted),
-                        ),
-                        Text(
-                          'CASE-SENSITIVE',
-                          style: AppTypography.micro.copyWith(color: p.textMuted),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: AppSpacing.sm + 2),
-                    AppTextField(
-                      palette: p,
-                      controller: _passwordController,
-                      placeholder: 'type to derive a key',
-                      obscure: true,
-                      prefixChar: '\$',
-                      trailingText: 'SHA-256 ▸ AES-256',
-                    ),
-                    const SizedBox(height: AppSpacing.sm),
                     Text(
-                      '// password gate arrives in task 8',
+                      '// password mode is set by the room creator. you\'ll be told on connect.',
                       style: AppTypography.caption.copyWith(color: p.textMuted),
                     ),
                   ],
