@@ -16,7 +16,7 @@
 - [x] Merge Phase 0 branches into `main`
 - [x] Node.js server skeleton
 - [x] WebSocket connection + TLS
-- [ ] Room creation (server-side code generation, in-memory only)
+- [x] Room creation (server-side code generation, in-memory only)
 - [ ] Room join flow (peer pairing by code)
 - [ ] Real-time message relay (encrypted payload pass-through, server cannot read)
 - [ ] Connection lifecycle + cleanup on disconnect
@@ -169,6 +169,25 @@ Done
 
 ### Branch
 task/server-websocket-tls
+
+### Status
+Done
+
+---
+
+## Session 2026-05-05 — Room creation (in-memory)
+
+### Completed
+- Created protocol.js (wire protocol constants, parseMessage with 1KB cap, errorMessage)
+- Created wordlist.js (64 frozen uppercase nouns)
+- Created rooms.js (Map registry, createRoom/removeRoom, ws.roomCode binding)
+- Updated ws.js with message handler: create_room → room_created, error handling
+- Disconnect cleans up room from registry
+- 11 tests pass (2 HTTP + 3 WS + 6 Rooms)
+- flutter analyze + flutter test still clean
+
+### Branch
+task/server-room-creation
 
 ### Status
 Done

@@ -7,6 +7,8 @@
 
 import { WebSocketServer } from 'ws';
 import config from './config.js';
+import { parseMessage, errorMessage, MSG_HELLO, MSG_CREATE_ROOM, MSG_ROOM_CREATED } from './protocol.js';
+import { createRoom, removeRoom, AlreadyInRoomError, RoomCodeExhaustedError } from './rooms.js';
 
 const HEARTBEAT_INTERVAL = 30_000;
 
@@ -30,7 +32,39 @@ export function attachWebSocket(httpServer) {
   wss.on('connection', (ws) => {
     ws.isAlive = true;
     ws.on('pong', () => { ws.isAlive = true; });
-    ws.send(JSON.stringify({ type: 'hello', v: '0.1.0' }));
+    ws.send(JSON.stringify({ type: MSG_HELLO, v: '0.1.0' }));
+
+    ws.on('message', (data) => {
+      const msg = parseMessage(data);
+      if (!msg) {
+        ws.send(errorMessage('bad_message', 'malformed or oversized'));
+        return;
+      }
+
+      switch (msg.type) {
+        case MSG_CREATE_ROOM: {
+          try {
+            const code = createRoom(ws);
+            ws.send(JSON.stringify({ type: MSG_ROOM_CREATED, code }));
+          } catch (err) {
+            if (err instanceof AlreadyInRoomError) {
+              ws.send(errorMessage('already_in_room', 'this connection already has a room'));
+            } else if (err instanceof RoomCodeExhaustedError) {
+              ws.send(errorMessage('exhausted', 'try again'));
+            }
+          }
+          break;
+        }
+        default:
+          ws.send(errorMessage('unknown_type', 'unsupported message type'));
+      }
+    });
+
+    ws.on('close', () => {
+      if (ws.roomCode) {
+        removeRoom(ws.roomCode);
+      }
+    });
   });
 
   heartbeatTimer = setInterval(() => {

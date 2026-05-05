@@ -33,6 +33,17 @@ npm test
 
 The test imports `start({ port: 0 })` from `src/server.js` to bind on a random port. Running `node src/index.js` directly still works as the normal entry point.
 
+## Wire protocol
+
+v0.1 — will grow.
+
+| Type | Direction | Shape |
+|------|-----------|-------|
+| `hello` | server → client | `{type:"hello", v:"0.1.0"}` |
+| `create_room` | client → server | `{type:"create_room"}` |
+| `room_created` | server → client | `{type:"room_created", code:"WORD-NNNN"}` |
+| `error` | server → client | `{type:"error", code:"<slug>", reason:"<fixed string>"}` |
+
 ## Logging policy
 
 The logger MUST NEVER log request bodies, IP addresses, headers, room codes, or anything derived from a client connection. It is for server-lifecycle events only (startup, shutdown, internal errors). This rule is the foundation of the "we cannot read your messages and we don't know who you are" promise.
@@ -43,4 +54,4 @@ TLS is not exercised by `npm test` yet — generating a self-signed cert in CI a
 
 ## Status
 
-WebSocket endpoint live at `WS_PATH` (default `/ws`). Sends a `hello` frame on connect. No room logic, no relay, no encryption yet — next tasks.
+Connections + room creation. No join, no relay, no encryption yet.

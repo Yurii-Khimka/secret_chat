@@ -1,70 +1,63 @@
 # Last Task Result
 
 ## Task
-WebSocket endpoint with optional TLS and hello frame (Phase 1, Task 2).
+Room creation with in-memory registry and wire protocol v0.1 (Phase 1, Task 3).
 
 ## Branch
-task/server-websocket-tls
+task/server-room-creation
 
 ## Commit
-feat: websocket endpoint with optional TLS and hello frame
+feat: room creation with in-memory registry and wire protocol v0.1
 
 ## What Was Done
 
-### File tree — created or modified under `server/`
+### File tree — new/modified under `server/`
 ```
 server/
-  package.json              (MODIFIED — added ws@^8 dependency)
-  package-lock.json         (MODIFIED — ws added)
-  .gitignore                (MODIFIED — added *.pem)
-  README.md                 (MODIFIED — updated run/status sections)
   src/
-    index.js                (MODIFIED — slim entry, delegates to server.js)
-    config.js               (MODIFIED — frozen object, TLS + WS_PATH env vars)
-    log.js                  (unchanged)
-    server.js               (NEW — http/https factory, start() export)
-    ws.js                   (NEW — WebSocket attach, hello frame, heartbeat)
+    protocol.js           (NEW — message constants, parseMessage, errorMessage)
+    wordlist.js           (NEW — 64 frozen uppercase nouns)
+    rooms.js              (NEW — in-memory Map registry, createRoom/removeRoom)
+    ws.js                 (MODIFIED — message handler, room lifecycle)
   test/
-    smoke.test.js           (MODIFIED — 5 tests: 2 HTTP + 3 WebSocket)
+    smoke.test.js         (MODIFIED — 11 tests total)
+  README.md               (MODIFIED — wire protocol section, status bump)
 ```
 
-### Startup log line (HTTP mode)
-```
-[2026-05-05T12:27:54.437Z] [info] server listening on http://127.0.0.1:3000 (ws path: /ws)
-```
+### Wire protocol (4 message types)
+| Type | Direction | Shape |
+|------|-----------|-------|
+| `hello` | server → client | `{type:"hello", v:"0.1.0"}` |
+| `create_room` | client → server | `{type:"create_room"}` |
+| `room_created` | server → client | `{type:"room_created", code:"WORD-NNNN"}` |
+| `error` | server → client | `{type:"error", code:"<slug>", reason:"<fixed string>"}` |
 
-### HTTPS variant (from source, server.js:36)
-```
-server listening on https://${host}:${actualPort} (ws path: ${wsPath})
-```
+### First 8 words from wordlist
+WOLF, FERN, MOON, IRON, OAK, JADE, ASH, RAIN
 
 ### npm test output
 ```
-▶ HTTP
-  ✔ GET /health returns 200 with version string (11ms)
+▶ secret-chat-server
+  ✔ GET /health returns 200 with version string (5ms)
   ✔ GET /nope returns 404 (1ms)
-✔ HTTP (13ms)
-▶ WebSocket
-  ✔ connects on /ws and receives hello frame (4ms)
-  ✔ wrong path is rejected (2ms)
+  ✔ WS connects on /ws and receives hello frame (5ms)
+  ✔ WS wrong path is rejected (1ms)
+  ✔ create_room returns a well-formed code (2ms)
+  ✔ second create_room on same socket → already_in_room (2ms)
+  ✔ bad JSON → bad_message (1ms)
+  ✔ unknown type → unknown_type (1ms)
+  ✔ oversized frame → bad_message (1ms)
+  ✔ disconnect removes the room (52ms)
   ✔ server closes cleanly with open ws client (2ms)
-✔ WebSocket (8ms)
-tests 5 | pass 5 | fail 0
+✔ secret-chat-server (80ms)
+tests 11 | pass 11 | fail 0
 ```
 
-### No-client-data comment confirmation
-`server/src/ws.js:1-6` carries the hard rule:
-```
-// HARD RULE: This module MUST NEVER log request bodies, IP addresses, headers,
-// room codes, frame contents, or anything derived from a client connection.
-// No console.log(message). No logging of request.headers,
-// request.socket.remoteAddress, or frame contents. Lifecycle counts only
-// (startup, shutdown). This rule is the foundation of the "we cannot read your
-// messages and we don't know who you are" promise.
-```
+### No-client-data rule
+`server/src/ws.js:1-6` still carries the hard rule comment. No log lines added on the message path.
 
-### *.pem gitignored
-`server/.gitignore` line 6: `*.pem`
+### ws.roomCode decision
+`ws.roomCode` is attached directly to the WebSocket instance (documented in `rooms.js:3`) because the WS lifecycle already drives cleanup — avoids a parallel Map to keep in sync.
 
 ### Flutter verification
 - `flutter analyze` — No issues found
@@ -74,8 +67,7 @@ tests 5 | pass 5 | fail 0
 Done
 
 ## Notes
-- `ws` is the only runtime dependency (no transitives).
-- TLS is opt-in via `TLS_CERT_PATH` + `TLS_KEY_PATH`. Half-configured throws on startup.
-- WebSocket path configurable via `WS_PATH` (default `/ws`).
-- Server tracks connections for forceful shutdown (needed for clean test teardown).
-- No TLS test in the suite — documented in README as manual-only for now.
+- 64-word list × 10000 numbers = 640,000 code namespace; collision retry up to 10 attempts.
+- Frame size capped at 1 KB for room-phase messages.
+- Error frames never echo client content — only fixed server strings.
+- No new dependencies (still just `ws`).
