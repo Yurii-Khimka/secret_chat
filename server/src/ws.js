@@ -11,8 +11,9 @@ import {
   parseMessage, errorMessage, CODE_REGEX,
   MSG_HELLO, MSG_CREATE_ROOM, MSG_ROOM_CREATED,
   MSG_JOIN_ROOM, MSG_JOINED, MSG_PEER_JOINED, MSG_PEER_LEFT,
+  MSG_MSG,
 } from './protocol.js';
-import { createRoom, joinRoom, leaveRoom, AlreadyInRoomError, RoomCodeExhaustedError } from './rooms.js';
+import { createRoom, joinRoom, leaveRoom, getPeer, AlreadyInRoomError, RoomCodeExhaustedError } from './rooms.js';
 
 const HEARTBEAT_INTERVAL = 30_000;
 
@@ -77,6 +78,24 @@ export function attachWebSocket(httpServer) {
             };
             ws.send(errorMessage(result.error, reasons[result.error]));
           }
+          break;
+        }
+        // RELAY: silent path. Do not add logging here.
+        case MSG_MSG: {
+          if (typeof msg.payload !== 'string' || msg.payload.length === 0) {
+            ws.send(errorMessage('bad_message', 'payload required'));
+            break;
+          }
+          if (!ws.roomCode) {
+            ws.send(errorMessage('not_in_room', 'create or join a room first'));
+            break;
+          }
+          const peer = getPeer(ws);
+          if (!peer) {
+            ws.send(errorMessage('not_paired', 'waiting for a peer to join'));
+            break;
+          }
+          try { peer.send(JSON.stringify({ type: MSG_MSG, payload: msg.payload })); } catch { /* noop */ }
           break;
         }
         default:

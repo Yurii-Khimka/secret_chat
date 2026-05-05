@@ -5,11 +5,13 @@ export const MSG_JOIN_ROOM = 'join_room';
 export const MSG_JOINED = 'joined';
 export const MSG_PEER_JOINED = 'peer_joined';
 export const MSG_PEER_LEFT = 'peer_left';
+export const MSG_MSG = 'msg';
 export const MSG_ERROR = 'error';
 
 export const CODE_REGEX = /^[A-Z]{3,5}-\d{4}$/;
 
-const MAX_FRAME_SIZE = 1024; // 1 KB cap for room-phase messages
+// 16 KB: fits AES-256-GCM ciphertext + base64 + nonce + tag for typical chat messages.
+const MAX_FRAME_SIZE = 16 * 1024;
 
 export function parseMessage(raw) {
   const str = typeof raw === 'string' ? raw : raw.toString();

@@ -84,6 +84,15 @@ export function removeRoom(code) {
   rooms.delete(code);
 }
 
+export function getPeer(ws) {
+  const code = ws.roomCode;
+  if (!code) return null;
+  const room = rooms.get(code);
+  if (!room) return null;
+  if (!room.joiner) return null;
+  return room.creator === ws ? room.joiner : room.creator;
+}
+
 export function getRoom(code) {
   return rooms.get(code);
 }
