@@ -1,7 +1,13 @@
 export const MSG_HELLO = 'hello';
 export const MSG_CREATE_ROOM = 'create_room';
 export const MSG_ROOM_CREATED = 'room_created';
+export const MSG_JOIN_ROOM = 'join_room';
+export const MSG_JOINED = 'joined';
+export const MSG_PEER_JOINED = 'peer_joined';
+export const MSG_PEER_LEFT = 'peer_left';
 export const MSG_ERROR = 'error';
+
+export const CODE_REGEX = /^[A-Z]{3,5}-\d{4}$/;
 
 const MAX_FRAME_SIZE = 1024; // 1 KB cap for room-phase messages
 

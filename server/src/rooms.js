@@ -28,15 +28,58 @@ export function createRoom(ws) {
   if (ws.roomCode) throw new AlreadyInRoomError();
   const code = generateCode();
   ws.roomCode = code;
-  rooms.set(code, { creator: ws, createdAt: Date.now() });
+  rooms.set(code, { creator: ws, joiner: null, createdAt: Date.now(), pairedAt: null });
   return code;
 }
 
+export function joinRoom(ws, code) {
+  const room = rooms.get(code);
+  if (!room) return { ok: false, error: 'not_found' };
+  if (room.creator === ws) return { ok: false, error: 'cannot_join_own' };
+  if (ws.roomCode) return { ok: false, error: 'already_in_room' };
+  if (room.joiner) return { ok: false, error: 'room_full' };
+
+  ws.roomCode = code;
+  room.joiner = ws;
+  room.pairedAt = Date.now();
+  return { ok: true, creator: room.creator };
+}
+
+export function leaveRoom(ws) {
+  const code = ws.roomCode;
+  if (!code) return { removed: false, notify: null };
+
+  const room = rooms.get(code);
+  if (!room) {
+    ws.roomCode = undefined;
+    return { removed: false, notify: null };
+  }
+
+  let notify = null;
+
+  if (room.creator === ws) {
+    notify = room.joiner || null;
+  } else {
+    notify = room.creator;
+  }
+
+  // Clear roomCode on both parties
+  room.creator.roomCode = undefined;
+  if (room.joiner) room.joiner.roomCode = undefined;
+
+  rooms.delete(code);
+  return { removed: true, notify };
+}
+
+// deprecated, use leaveRoom(ws)
 export function removeRoom(code) {
   const entry = rooms.get(code);
   if (!entry) return;
   if (entry.creator.roomCode === code) {
     entry.creator.roomCode = undefined;
+  }
+  if (entry.joiner && entry.joiner.roomCode === code) {
+    entry.joiner.roomCode = undefined;
   }
   rooms.delete(code);
 }

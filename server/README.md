@@ -42,7 +42,13 @@ v0.1 — will grow.
 | `hello` | server → client | `{type:"hello", v:"0.1.0"}` |
 | `create_room` | client → server | `{type:"create_room"}` |
 | `room_created` | server → client | `{type:"room_created", code:"WORD-NNNN"}` |
+| `join_room` | client → server | `{type:"join_room", code:"WORD-NNNN"}` |
+| `joined` | server → joiner | `{type:"joined", code:"WORD-NNNN"}` |
+| `peer_joined` | server → creator | `{type:"peer_joined"}` |
+| `peer_left` | server → survivor | `{type:"peer_left"}` |
 | `error` | server → client | `{type:"error", code:"<slug>", reason:"<fixed string>"}` |
+
+Pairing is 1:1. Either party leaving destroys the room.
 
 ## Logging policy
 
@@ -54,4 +60,4 @@ TLS is not exercised by `npm test` yet — generating a self-signed cert in CI a
 
 ## Status
 
-Connections + room creation. No join, no relay, no encryption yet.
+Connections + room creation + 1:1 pairing. No relay, no encryption yet.

@@ -7,8 +7,12 @@
 
 import { WebSocketServer } from 'ws';
 import config from './config.js';
-import { parseMessage, errorMessage, MSG_HELLO, MSG_CREATE_ROOM, MSG_ROOM_CREATED } from './protocol.js';
-import { createRoom, removeRoom, AlreadyInRoomError, RoomCodeExhaustedError } from './rooms.js';
+import {
+  parseMessage, errorMessage, CODE_REGEX,
+  MSG_HELLO, MSG_CREATE_ROOM, MSG_ROOM_CREATED,
+  MSG_JOIN_ROOM, MSG_JOINED, MSG_PEER_JOINED, MSG_PEER_LEFT,
+} from './protocol.js';
+import { createRoom, joinRoom, leaveRoom, AlreadyInRoomError, RoomCodeExhaustedError } from './rooms.js';
 
 const HEARTBEAT_INTERVAL = 30_000;
 
@@ -55,14 +59,37 @@ export function attachWebSocket(httpServer) {
           }
           break;
         }
+        case MSG_JOIN_ROOM: {
+          if (typeof msg.code !== 'string' || !CODE_REGEX.test(msg.code)) {
+            ws.send(errorMessage('bad_message', 'invalid room code format'));
+            break;
+          }
+          const result = joinRoom(ws, msg.code);
+          if (result.ok) {
+            ws.send(JSON.stringify({ type: MSG_JOINED, code: msg.code }));
+            result.creator.send(JSON.stringify({ type: MSG_PEER_JOINED }));
+          } else {
+            const reasons = {
+              not_found: 'room does not exist',
+              room_full: 'room already has two participants',
+              cannot_join_own: 'cannot join a room you created',
+              already_in_room: 'this connection already has a room',
+            };
+            ws.send(errorMessage(result.error, reasons[result.error]));
+          }
+          break;
+        }
         default:
           ws.send(errorMessage('unknown_type', 'unsupported message type'));
       }
     });
 
     ws.on('close', () => {
-      if (ws.roomCode) {
-        removeRoom(ws.roomCode);
+      const result = leaveRoom(ws);
+      if (result.notify) {
+        try {
+          result.notify.send(JSON.stringify({ type: MSG_PEER_LEFT }));
+        } catch { /* peer socket may already be closing */ }
       }
     });
   });

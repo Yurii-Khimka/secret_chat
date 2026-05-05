@@ -17,7 +17,7 @@
 - [x] Node.js server skeleton
 - [x] WebSocket connection + TLS
 - [x] Room creation (server-side code generation, in-memory only)
-- [ ] Room join flow (peer pairing by code)
+- [x] Room join flow (peer pairing by code)
 - [ ] Real-time message relay (encrypted payload pass-through, server cannot read)
 - [ ] Connection lifecycle + cleanup on disconnect
 
@@ -188,6 +188,24 @@ Done
 
 ### Branch
 task/server-room-creation
+
+### Status
+Done
+
+---
+
+## Session 2026-05-05 — Room join + peer pairing
+
+### Completed
+- Extended wire protocol: join_room, joined, peer_joined, peer_left
+- Added joinRoom (discriminated union return) and leaveRoom to rooms.js
+- rooms.js does state only — zero ws.send calls (I/O in ws.js only)
+- Either party disconnecting destroys room and notifies survivor with peer_left
+- 19 tests pass (11 prior + 8 pairing scenarios)
+- flutter analyze + flutter test still clean
+
+### Branch
+task/server-room-join
 
 ### Status
 Done

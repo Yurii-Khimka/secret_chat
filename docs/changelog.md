@@ -4,6 +4,16 @@ _Most recent changes appear at the top._
 
 ---
 
+## 2026-05-05 — Room join + peer pairing
+
+- Extended protocol with join_room, joined, peer_joined, peer_left message types
+- Added joinRoom (returns discriminated union) and leaveRoom to rooms.js — state only, no I/O
+- 1:1 pairing enforced: room_full, cannot_join_own, already_in_room errors
+- Either disconnect destroys room, survivor gets peer_left
+- CODE_REGEX validation on incoming code fields
+- Branch: task/server-room-join
+- Commit: feat: 1:1 room join with peer pairing and disconnect notifications
+
 ## 2026-05-05 — Room creation (in-memory)
 
 - Added wire protocol module (protocol.js): `hello`, `create_room`, `room_created`, `error`
