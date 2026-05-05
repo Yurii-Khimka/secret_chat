@@ -1,70 +1,81 @@
 # Last Task Result
 
 ## Task
-Node.js server skeleton with /health endpoint (Phase 1, Task 1).
+WebSocket endpoint with optional TLS and hello frame (Phase 1, Task 2).
 
 ## Branch
-task/server-skeleton
+task/server-websocket-tls
 
 ## Commit
-feat: node.js server skeleton with /health endpoint
+feat: websocket endpoint with optional TLS and hello frame
 
 ## What Was Done
 
-### File tree — created under `server/`
+### File tree — created or modified under `server/`
 ```
 server/
-  package.json
-  package-lock.json
-  .gitignore
-  .nvmrc
-  README.md
+  package.json              (MODIFIED — added ws@^8 dependency)
+  package-lock.json         (MODIFIED — ws added)
+  .gitignore                (MODIFIED — added *.pem)
+  README.md                 (MODIFIED — updated run/status sections)
   src/
-    index.js
-    config.js
-    log.js
+    index.js                (MODIFIED — slim entry, delegates to server.js)
+    config.js               (MODIFIED — frozen object, TLS + WS_PATH env vars)
+    log.js                  (unchanged)
+    server.js               (NEW — http/https factory, start() export)
+    ws.js                   (NEW — WebSocket attach, hello frame, heartbeat)
   test/
-    smoke.test.js
+    smoke.test.js           (MODIFIED — 5 tests: 2 HTTP + 3 WebSocket)
 ```
 
-Root `.gitignore` — appended `server/node_modules/`.
-
-### Startup log line
+### Startup log line (HTTP mode)
 ```
-[2026-05-05T11:53:26.623Z] [info] server listening on 127.0.0.1:3000
+[2026-05-05T12:27:54.437Z] [info] server listening on http://127.0.0.1:3000 (ws path: /ws)
 ```
 
-### curl verification
+### HTTPS variant (from source, server.js:36)
 ```
-$ curl localhost:3000/health
-secret-chat-server v0.1.0
+server listening on https://${host}:${actualPort} (ws path: ${wsPath})
 ```
 
 ### npm test output
 ```
-✔ GET /health returns 200 with version string (12ms)
-✔ GET /nope returns 404 (1ms)
-ℹ tests 2 | pass 2 | fail 0
+▶ HTTP
+  ✔ GET /health returns 200 with version string (11ms)
+  ✔ GET /nope returns 404 (1ms)
+✔ HTTP (13ms)
+▶ WebSocket
+  ✔ connects on /ws and receives hello frame (4ms)
+  ✔ wrong path is rejected (2ms)
+  ✔ server closes cleanly with open ws client (2ms)
+✔ WebSocket (8ms)
+tests 5 | pass 5 | fail 0
 ```
+
+### No-client-data comment confirmation
+`server/src/ws.js:1-6` carries the hard rule:
+```
+// HARD RULE: This module MUST NEVER log request bodies, IP addresses, headers,
+// room codes, frame contents, or anything derived from a client connection.
+// No console.log(message). No logging of request.headers,
+// request.socket.remoteAddress, or frame contents. Lifecycle counts only
+// (startup, shutdown). This rule is the foundation of the "we cannot read your
+// messages and we don't know who you are" promise.
+```
+
+### *.pem gitignored
+`server/.gitignore` line 6: `*.pem`
 
 ### Flutter verification
 - `flutter analyze` — No issues found
 - `flutter test` — All tests passed (4/4)
 
-### Logging policy confirmation
-`server/src/log.js:1-5` contains the "no client data ever" comment:
-```
-// HARD RULE: This logger MUST NEVER log request bodies, IP addresses, headers,
-// room codes, or anything derived from a client connection. It is for
-// server-lifecycle events only (startup, shutdown, internal errors). This rule
-// is the foundation of the "we cannot read your messages and we don't know who
-// you are" promise.
-```
-
 ## Status
 Done
 
 ## Notes
-- `index.js` exports a `start(port)` function so the test can bind on port 0 (random free port). Running `node src/index.js` directly still works as the entry point.
-- Node v24 required `node --test test/*.test.js` glob instead of `node --test test/` directory form.
-- Zero runtime dependencies, zero dev dependencies — built-in modules only.
+- `ws` is the only runtime dependency (no transitives).
+- TLS is opt-in via `TLS_CERT_PATH` + `TLS_KEY_PATH`. Half-configured throws on startup.
+- WebSocket path configurable via `WS_PATH` (default `/ws`).
+- Server tracks connections for forceful shutdown (needed for clean test teardown).
+- No TLS test in the suite — documented in README as manual-only for now.

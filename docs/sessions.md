@@ -15,7 +15,7 @@
 ### Phase 1 — Foundation 🔜 next
 - [x] Merge Phase 0 branches into `main`
 - [x] Node.js server skeleton
-- [ ] WebSocket connection + TLS
+- [x] WebSocket connection + TLS
 - [ ] Room creation (server-side code generation, in-memory only)
 - [ ] Room join flow (peer pairing by code)
 - [ ] Real-time message relay (encrypted payload pass-through, server cannot read)
@@ -150,6 +150,25 @@ Done
 
 ### Branch
 task/server-skeleton
+
+### Status
+Done
+
+---
+
+## Session 2026-05-05 — WebSocket + optional TLS
+
+### Completed
+- Added `ws@^8` as sole runtime dependency
+- Refactored index.js into server.js (http/https factory) + ws.js (WebSocket attach)
+- WebSocket on `/ws` sends `{type:"hello",v:"0.1.0"}` on connect, heartbeat every 30s
+- TLS opt-in via TLS_CERT_PATH + TLS_KEY_PATH env vars (half-configured throws)
+- config.js exports frozen object with validation
+- 5 tests pass (2 HTTP + 3 WebSocket)
+- flutter analyze + flutter test still clean
+
+### Branch
+task/server-websocket-tls
 
 ### Status
 Done
