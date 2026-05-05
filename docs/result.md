@@ -1,44 +1,46 @@
 # Last Task Result
 
 ## Task
-Real-time encrypted-payload relay — server forwards `msg` frames between paired peers without inspecting, logging, or storing payloads (Phase 1, Task 5).
+Lifecycle hardening — shutdown contract, drop deprecated removeRoom, Phase 1 closeout (Phase 1, Task 6).
 
 ## Branch
-task/server-relay
+task/server-lifecycle-hardening
 
 ## Commit
-feat: opaque-payload message relay between paired peers
+chore: lifecycle hardening — shutdown contract, drop deprecated removeRoom
 
 ## What Was Done
 
-### File tree (modified) under `server/`
+### File tree (modified/deleted) under `server/`
 ```
 server/src/
-  protocol.js     (MODIFIED — added MSG_MSG, raised MAX_FRAME_SIZE to 16 KB)
-  rooms.js        (MODIFIED — added getPeer(ws))
-  ws.js           (MODIFIED — MSG_MSG relay handler, silent path)
+  server.js       (MODIFIED — shutdown contract comment, teardown() called in close())
+  ws.js           (MODIFIED — attachWebSocket returns { wss, teardown })
+  rooms.js        (MODIFIED — removed deprecated removeRoom(code))
+  index.js        (MODIFIED — 5-second hard timeout on SIGINT/SIGTERM)
 server/test/
-  smoke.test.js   (MODIFIED — 27 tests total: 19 prior + 8 relay)
-server/README.md  (MODIFIED — 9 message types, relay invariants, status bump)
+  smoke.test.js   (MODIFIED — 29 tests: 27 prior + 2 lifecycle)
+server/README.md  (MODIFIED — Lifecycle section, status bump to Phase 1 closed)
 ```
 
-### Updated wire-protocol table (all 9 types)
-| Type | Direction | Shape |
-|------|-----------|-------|
-| `hello` | server -> client | `{type:"hello", v:"0.1.0"}` |
-| `create_room` | client -> server | `{type:"create_room"}` |
-| `room_created` | server -> client | `{type:"room_created", code:"WORD-NNNN"}` |
-| `join_room` | client -> server | `{type:"join_room", code:"WORD-NNNN"}` |
-| `joined` | server -> joiner | `{type:"joined", code:"WORD-NNNN"}` |
-| `peer_joined` | server -> creator | `{type:"peer_joined"}` |
-| `peer_left` | server -> survivor | `{type:"peer_left"}` |
-| `msg` | bidirectional | `{type:"msg", payload:"<opaque string>"}` |
-| `error` | server -> client | `{type:"error", code:"<slug>", reason:"<fixed string>"}` |
+### Shutdown contract comment
+`server/src/server.js:1-9`:
+```
+// Shutdown contract. When close() is awaited:
+// 1. The HTTP/HTTPS server stops accepting new connections.
+// 2. The WebSocketServer stops accepting new upgrades.
+// 3. The heartbeat interval is cleared.
+// 4. All open client sockets are terminated (forcefully — we do not wait
+//    for graceful WebSocket close handshakes during shutdown).
+// 5. The returned promise resolves once steps 1–4 are complete.
+// 6. Process holds no active timers, no open sockets. SIGINT/SIGTERM in
+//    index.js triggers close() and then process.exit(0).
+```
 
-### Silent-path comment
-`server/src/ws.js:83` — `// RELAY: silent path. Do not add logging here.`
+### removeRoom deletion
+`git grep removeRoom` — zero references remain. Function and export deleted from rooms.js.
 
-### npm test — 27/27 pass
+### npm test — 29/29 pass
 ```
   GET /health returns 200 with version string
   GET /nope returns 404
@@ -66,12 +68,14 @@ server/README.md  (MODIFIED — 9 message types, relay invariants, status bump)
   Relay: non-string payload -> bad_message
   Relay: oversized frame -> bad_message, peer receives nothing
   Relay: server does not modify payload (special chars)
+  Lifecycle: shutdown completes within 500ms with 5 connected clients
+  Lifecycle: heartbeat interval is cleared on shutdown
   server closes cleanly with open ws client
-tests 27 | pass 27 | fail 0
+tests 29 | pass 29 | fail 0
 ```
 
-### Relay path logging verification
-grep for `console.` / `log.info(` / `log.warn(` in ws.js relay branch: **0 matches**.
+### Shutdown elapsed time
+~6ms with 5 connected clients (well under 500ms limit).
 
 ### Flutter verification
 - `flutter analyze` — No issues found
@@ -81,6 +85,6 @@ grep for `console.` / `log.info(` / `log.warn(` in ws.js relay branch: **0 match
 Done
 
 ## Notes
-- `getPeer(ws)` returns null for both unpaired and not-in-room cases; the relay handler differentiates by checking `ws.roomCode` first.
-- Relay try/catch on peer.send swallows errors silently — dead peers are detected via the existing `peer_left` mechanism.
-- Frame cap raised to 16 KB to accommodate future AES-256-GCM ciphertext + base64. The cap bounds parse work, not payload inspection.
+- `attachWebSocket` now returns `{ wss, teardown }` instead of bare `wss`. The `teardown()` function is called explicitly in `close()` before `server.close()`, ensuring WS clients are terminated and the heartbeat interval cleared before the HTTP server close is awaited. The `httpServer.on('close')` handler remains as a safety net.
+- The 5-second hard timeout in index.js uses `.unref()` so it doesn't itself prevent process exit.
+- Phase 1 is now fully closed. All 6 checklist items marked done.

@@ -71,19 +71,6 @@ export function leaveRoom(ws) {
   return { removed: true, notify };
 }
 
-// deprecated, use leaveRoom(ws)
-export function removeRoom(code) {
-  const entry = rooms.get(code);
-  if (!entry) return;
-  if (entry.creator.roomCode === code) {
-    entry.creator.roomCode = undefined;
-  }
-  if (entry.joiner && entry.joiner.roomCode === code) {
-    entry.joiner.roomCode = undefined;
-  }
-  rooms.delete(code);
-}
-
 export function getPeer(ws) {
   const code = ws.roomCode;
   if (!code) return null;

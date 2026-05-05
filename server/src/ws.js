@@ -124,13 +124,15 @@ export function attachWebSocket(httpServer) {
     }
   }, HEARTBEAT_INTERVAL);
 
-  httpServer.on('close', () => {
+  function teardown() {
     clearInterval(heartbeatTimer);
     for (const ws of wss.clients) {
       ws.terminate();
     }
     wss.close();
-  });
+  }
 
-  return wss;
+  httpServer.on('close', teardown);
+
+  return { wss, teardown };
 }

@@ -63,10 +63,23 @@ Frame cap: 16 KB per message.
 
 The logger MUST NEVER log request bodies, IP addresses, headers, room codes, or anything derived from a client connection. It is for server-lifecycle events only (startup, shutdown, internal errors). This rule is the foundation of the "we cannot read your messages and we don't know who you are" promise.
 
+## Lifecycle
+
+Shutdown contract. When `close()` is awaited:
+
+1. The HTTP/HTTPS server stops accepting new connections.
+2. The WebSocketServer stops accepting new upgrades.
+3. The heartbeat interval is cleared.
+4. All open client sockets are terminated (forcefully — we do not wait for graceful WebSocket close handshakes during shutdown).
+5. The returned promise resolves once steps 1–4 are complete.
+6. Process holds no active timers, no open sockets. SIGINT/SIGTERM in `index.js` triggers `close()` and then `process.exit(0)`.
+
+SIGINT/SIGTERM have a 5-second hard cap — if `close()` doesn't resolve in time, the process exits with code 1.
+
 ## TLS testing
 
 TLS is not exercised by `npm test` yet — generating a self-signed cert in CI adds complexity for marginal value at this stage. Manual verification only for now. Re-evaluate when we have a deployment target.
 
 ## Status
 
-Connections + room creation + 1:1 pairing + opaque-payload relay. No encryption yet — payload is whatever the client sends.
+Connections + room creation + 1:1 pairing + opaque relay + clean shutdown. Phase 1 closed. Next: Phase 2 — on-device Argon2 + AES-256.
