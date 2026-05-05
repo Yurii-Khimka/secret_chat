@@ -4,6 +4,16 @@ _Most recent changes appear at the top._
 
 ---
 
+## 2026-05-05 — Room creation (in-memory)
+
+- Added wire protocol module (protocol.js): `hello`, `create_room`, `room_created`, `error`
+- Added 64-word list for WORD-NNNN room codes (crypto.randomInt, collision retry)
+- Added in-memory room registry (rooms.js): createRoom, removeRoom, ws.roomCode binding
+- Message handler in ws.js: parses frames (1KB cap), dispatches create_room, rejects unknowns
+- Error frames never echo client content; no new log lines on data path
+- Branch: task/server-room-creation
+- Commit: feat: room creation with in-memory registry and wire protocol v0.1
+
 ## 2026-05-05 — WebSocket + optional TLS
 
 - Added `ws@^8` (sole runtime dep); refactored server into server.js + ws.js
