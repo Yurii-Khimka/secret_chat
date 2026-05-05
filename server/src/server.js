@@ -1,3 +1,13 @@
+// Shutdown contract. When close() is awaited:
+// 1. The HTTP/HTTPS server stops accepting new connections.
+// 2. The WebSocketServer stops accepting new upgrades.
+// 3. The heartbeat interval is cleared.
+// 4. All open client sockets are terminated (forcefully — we do not wait
+//    for graceful WebSocket close handshakes during shutdown).
+// 5. The returned promise resolves once steps 1–4 are complete.
+// 6. Process holds no active timers, no open sockets. SIGINT/SIGTERM in
+//    index.js triggers close() and then process.exit(0).
+
 import http from 'node:http';
 import https from 'node:https';
 import fs from 'node:fs';
@@ -33,7 +43,7 @@ export function start(overrides = {}) {
     protocol = 'http';
   }
 
-  attachWebSocket(server);
+  const { teardown } = attachWebSocket(server);
 
   // Track connections for forceful shutdown
   const connections = new Set();
@@ -49,6 +59,7 @@ export function start(overrides = {}) {
       resolve({
         server,
         close: () => new Promise((res) => {
+          teardown();
           for (const socket of connections) {
             socket.destroy();
           }

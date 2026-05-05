@@ -12,14 +12,14 @@
 - [x] Task 4 — Four production screens + navigation (`task/screens`)
 - [x] Task 5 — Settings screen + theme picker + persistence tests (`task/settings-and-theme-picker`)
 
-### Phase 1 — Foundation 🔜 next
+### Phase 1 — Foundation ✅ complete
 - [x] Merge Phase 0 branches into `main`
 - [x] Node.js server skeleton
 - [x] WebSocket connection + TLS
 - [x] Room creation (server-side code generation, in-memory only)
 - [x] Room join flow (peer pairing by code)
 - [x] Real-time message relay (encrypted payload pass-through, server cannot read)
-- [ ] Connection lifecycle + cleanup on disconnect
+- [x] Connection lifecycle + cleanup on disconnect
 
 ### Phase 2 — Security
 - [ ] Argon2 password → key derivation on device
@@ -224,6 +224,26 @@ Done
 
 ### Branch
 task/server-relay
+
+### Status
+Done
+
+---
+
+## Session 2026-05-05 — Lifecycle hardening + Phase 1 closeout
+
+### Completed
+- Audited and documented shutdown contract in server.js (verbatim comment)
+- `attachWebSocket` now returns `{ wss, teardown }` — teardown called explicitly in `close()`
+- Dropped deprecated `removeRoom(code)` — zero callers remained
+- Added 5-second hard timeout on SIGINT/SIGTERM in index.js
+- 2 lifecycle tests: shutdown with 5 clients < 500ms, no leaked timers
+- 29 tests pass (27 prior + 2 lifecycle)
+- flutter analyze + flutter test still clean
+- Phase 1 ✅ complete
+
+### Branch
+task/server-lifecycle-hardening
 
 ### Status
 Done

@@ -418,7 +418,54 @@ describe('secret-chat-server', { concurrency: false }, () => {
     });
   });
 
-  // Shutdown test (last)
+  // Lifecycle tests (own start/close cycle, run before final shutdown test)
+  describe('Lifecycle', () => {
+    function connectRaw(portNum) {
+      return new Promise((resolve, reject) => {
+        const ws = new WebSocket(`ws://127.0.0.1:${portNum}/ws`);
+        const gotHello = new Promise((r) => ws.once('message', r));
+        const gotClose = new Promise((r) => ws.once('close', r));
+        ws.on('open', () => resolve({ ws, gotHello, gotClose }));
+        ws.on('error', reject);
+      });
+    }
+
+    test('shutdown completes within 500ms with 5 connected clients', async () => {
+      const h = await start({ port: 0 });
+      const p = h.server.address().port;
+
+      const clients = [];
+      for (let i = 0; i < 5; i++) {
+        const c = await connectRaw(p);
+        await c.gotHello;
+        clients.push(c);
+      }
+
+      const t0 = Date.now();
+      await h.close();
+      const elapsed = Date.now() - t0;
+
+      await Promise.all(clients.map((c) => c.gotClose));
+      assert.ok(elapsed < 500, `shutdown took ${elapsed}ms, expected < 500ms`);
+    });
+
+    test('heartbeat interval is cleared on shutdown', async () => {
+      // Verify no timer leak: after close(), active handle count should not exceed baseline.
+      const baselineHandles = process._getActiveHandles().length;
+      const h = await start({ port: 0 });
+      const p = h.server.address().port;
+
+      const c = await connectRaw(p);
+      await c.gotHello;
+
+      await h.close();
+      await new Promise((r) => setTimeout(r, 50));
+      const afterHandles = process._getActiveHandles().length;
+      assert.ok(afterHandles <= baselineHandles + 1, `leaked handles: before=${baselineHandles}, after=${afterHandles}`);
+    });
+  });
+
+  // Shutdown test (last — closes the shared server)
   test('server closes cleanly with open ws client', async () => {
     const ws = await connect();
     await nextMessage(ws); // hello

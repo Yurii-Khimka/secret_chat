@@ -4,6 +4,17 @@ _Most recent changes appear at the top._
 
 ---
 
+## 2026-05-05 — Lifecycle hardening + Phase 1 closeout
+
+- Documented shutdown contract verbatim in server.js and README
+- `attachWebSocket` returns `{ wss, teardown }` — teardown called in `close()` before `server.close()`
+- Dropped deprecated `removeRoom(code)` (zero callers)
+- Added 5-second hard timeout on SIGINT/SIGTERM in index.js
+- 2 lifecycle tests (shutdown timing + no leaked timers), 29 total
+- Phase 1 complete
+- Branch: task/server-lifecycle-hardening
+- Commit: chore: lifecycle hardening — shutdown contract, drop deprecated removeRoom
+
 ## 2026-05-05 — Opaque-payload message relay
 
 - Added `msg` message type for bidirectional relay between paired peers
