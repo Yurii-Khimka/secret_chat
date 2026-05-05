@@ -160,6 +160,153 @@ describe('secret-chat-server', { concurrency: false }, () => {
     assert.ok(!_allCodes().includes(code));
   });
 
+  // Pairing tests
+  test('successful join — joiner gets joined, creator gets peer_joined', async () => {
+    const a = await connect();
+    await nextMessage(a); // hello
+    a.send(JSON.stringify({ type: 'create_room' }));
+    const created = await nextMessage(a);
+    const code = created.code;
+
+    const b = await connect();
+    await nextMessage(b); // hello
+    b.send(JSON.stringify({ type: 'join_room', code }));
+
+    const joined = await nextMessage(b);
+    assert.equal(joined.type, 'joined');
+    assert.equal(joined.code, code);
+
+    const peerJoined = await nextMessage(a);
+    assert.equal(peerJoined.type, 'peer_joined');
+
+    await closeWs(b);
+    await new Promise((r) => setTimeout(r, 50));
+    await closeWs(a);
+  });
+
+  test('wrong code → not_found', async () => {
+    const ws = await connect();
+    await nextMessage(ws); // hello
+    ws.send(JSON.stringify({ type: 'join_room', code: 'ZZZZ-9999' }));
+    const msg = await nextMessage(ws);
+    assert.equal(msg.type, 'error');
+    assert.equal(msg.code, 'not_found');
+    await closeWs(ws);
+  });
+
+  test('code with bad format → bad_message', async () => {
+    const ws = await connect();
+    await nextMessage(ws); // hello
+    ws.send(JSON.stringify({ type: 'join_room', code: 'lower-1' }));
+    const msg = await nextMessage(ws);
+    assert.equal(msg.type, 'error');
+    assert.equal(msg.code, 'bad_message');
+    await closeWs(ws);
+  });
+
+  test('room full — third client rejected', async () => {
+    const a = await connect();
+    await nextMessage(a); // hello
+    a.send(JSON.stringify({ type: 'create_room' }));
+    const created = await nextMessage(a);
+    const code = created.code;
+
+    const b = await connect();
+    await nextMessage(b); // hello
+    b.send(JSON.stringify({ type: 'join_room', code }));
+    await nextMessage(b); // joined
+    await nextMessage(a); // peer_joined
+
+    const c = await connect();
+    await nextMessage(c); // hello
+    c.send(JSON.stringify({ type: 'join_room', code }));
+    const msg = await nextMessage(c);
+    assert.equal(msg.type, 'error');
+    assert.equal(msg.code, 'room_full');
+
+    await closeWs(c);
+    await closeWs(b);
+    await new Promise((r) => setTimeout(r, 50));
+    await closeWs(a);
+  });
+
+  test('cannot join own room', async () => {
+    const a = await connect();
+    await nextMessage(a); // hello
+    a.send(JSON.stringify({ type: 'create_room' }));
+    const created = await nextMessage(a);
+    a.send(JSON.stringify({ type: 'join_room', code: created.code }));
+    const msg = await nextMessage(a);
+    assert.equal(msg.type, 'error');
+    assert.equal(msg.code, 'cannot_join_own');
+    await closeWs(a);
+  });
+
+  test('joiner already in another room → already_in_room', async () => {
+    const a = await connect();
+    await nextMessage(a); // hello
+    a.send(JSON.stringify({ type: 'create_room' }));
+    const room1 = await nextMessage(a);
+
+    const b = await connect();
+    await nextMessage(b); // hello
+    b.send(JSON.stringify({ type: 'create_room' }));
+    await nextMessage(b); // room_created for b
+
+    b.send(JSON.stringify({ type: 'join_room', code: room1.code }));
+    const msg = await nextMessage(b);
+    assert.equal(msg.type, 'error');
+    assert.equal(msg.code, 'already_in_room');
+
+    await closeWs(b);
+    await new Promise((r) => setTimeout(r, 50));
+    await closeWs(a);
+  });
+
+  test('joiner disconnects → creator gets peer_left, room removed', async () => {
+    const a = await connect();
+    await nextMessage(a); // hello
+    a.send(JSON.stringify({ type: 'create_room' }));
+    const created = await nextMessage(a);
+    const code = created.code;
+
+    const b = await connect();
+    await nextMessage(b); // hello
+    b.send(JSON.stringify({ type: 'join_room', code }));
+    await nextMessage(b); // joined
+    await nextMessage(a); // peer_joined
+
+    await closeWs(b);
+    const peerLeft = await nextMessage(a);
+    assert.equal(peerLeft.type, 'peer_left');
+
+    await new Promise((r) => setTimeout(r, 50));
+    assert.ok(!_allCodes().includes(code));
+    await closeWs(a);
+  });
+
+  test('creator disconnects → joiner gets peer_left, room removed', async () => {
+    const a = await connect();
+    await nextMessage(a); // hello
+    a.send(JSON.stringify({ type: 'create_room' }));
+    const created = await nextMessage(a);
+    const code = created.code;
+
+    const b = await connect();
+    await nextMessage(b); // hello
+    b.send(JSON.stringify({ type: 'join_room', code }));
+    await nextMessage(b); // joined
+    await nextMessage(a); // peer_joined
+
+    await closeWs(a);
+    const peerLeft = await nextMessage(b);
+    assert.equal(peerLeft.type, 'peer_left');
+
+    await new Promise((r) => setTimeout(r, 50));
+    assert.ok(!_allCodes().includes(code));
+    await closeWs(b);
+  });
+
   // Shutdown test (last)
   test('server closes cleanly with open ws client', async () => {
     const ws = await connect();
