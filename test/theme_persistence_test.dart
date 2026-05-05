@@ -6,6 +6,7 @@ import 'package:secret_chat/theme/app_theme_name.dart';
 import 'package:secret_chat/theme/palettes/lime_palette.dart';
 import 'package:secret_chat/theme/palettes/mint_palette.dart';
 import 'package:secret_chat/theme/palettes/indigo_palette.dart';
+import 'package:secret_chat/network/chat_client.dart';
 
 void main() {
   group('Theme persistence', () {
@@ -30,7 +31,7 @@ void main() {
       final controller = ThemeController();
       await controller.load();
 
-      await tester.pumpWidget(SecretChatApp(controller: controller));
+      await tester.pumpWidget(SecretChatApp(controller: controller, chatClient: ChatClient()));
       await tester.pump();
 
       // Navigate to Settings

@@ -1,90 +1,58 @@
 # Last Task Result
 
 ## Task
-Lifecycle hardening — shutdown contract, drop deprecated removeRoom, Phase 1 closeout (Phase 1, Task 6).
+Task 7 — Flutter WebSocket client wired to real server (Phase 2). Closed out by Task 7b (UX gaps) and Task 7c (live verification).
 
 ## Branch
-task/server-lifecycle-hardening
+task/flutter-network-client
 
 ## Commit
-chore: lifecycle hardening — shutdown contract, drop deprecated removeRoom
+docs: close out task 7 — owner-verified J.3–J.7 pass
 
 ## What Was Done
 
-### File tree (modified/deleted) under `server/`
-```
-server/src/
-  server.js       (MODIFIED — shutdown contract comment, teardown() called in close())
-  ws.js           (MODIFIED — attachWebSocket returns { wss, teardown })
-  rooms.js        (MODIFIED — removed deprecated removeRoom(code))
-  index.js        (MODIFIED — 5-second hard timeout on SIGINT/SIGTERM)
-server/test/
-  smoke.test.js   (MODIFIED — 29 tests: 27 prior + 2 lifecycle)
-server/README.md  (MODIFIED — Lifecycle section, status bump to Phase 1 closed)
-```
+### UX changes (Task 7b)
 
-### Shutdown contract comment
-`server/src/server.js:1-9`:
-```
-// Shutdown contract. When close() is awaited:
-// 1. The HTTP/HTTPS server stops accepting new connections.
-// 2. The WebSocketServer stops accepting new upgrades.
-// 3. The heartbeat interval is cleared.
-// 4. All open client sockets are terminated (forcefully — we do not wait
-//    for graceful WebSocket close handshakes during shutdown).
-// 5. The returned promise resolves once steps 1–4 are complete.
-// 6. Process holds no active timers, no open sockets. SIGINT/SIGTERM in
-//    index.js triggers close() and then process.exit(0).
-```
+| File | Change |
+|------|--------|
+| `lib/screens/join_room_screen.dart` | Added `// password gate arrives in task 8` helper text below PASSWORD field (muted color) |
+| `lib/main.dart` | Lifecycle: only `detached` triggers close (removed `paused`) |
+| `lib/screens/chat_screen.dart` | Added `[plaintext — encryption arrives in task 9]` warning banner above message list |
+| `lib/components/system_message.dart` | Extended with `SystemMessageTone` enum (muted/warning) — reused, not duplicated |
 
-### removeRoom deletion
-`git grep removeRoom` — zero references remain. Function and export deleted from rooms.js.
+### SystemMessage extension
+`lib/components/system_message.dart` — added `tone` parameter with `SystemMessageTone.muted` (default, backward compatible) and `SystemMessageTone.warning` (uses `palette.warning` color). No new component created.
+
+### Owner-verified live testing (Task 7c)
+The Owner manually executed J.1–J.7 against a real iPhone 17 simulator + running Node server + wscat. CocoaPods was installed to support iOS simulator builds. All steps passed.
+
+### J.1–J.7 Verification table
+
+| Step | Action | Result | Observation |
+|------|--------|--------|-------------|
+| J.1 | `cd server && npm run dev` | PASS | server listening on http://127.0.0.1:3000 |
+| J.2 | `flutter run` on simulator | PASS | app launched on iPhone 17 simulator after CocoaPods install |
+| J.3 | Tap CREATE ROOM | PASS | CREATE ROOM produced a unique WORD-NNNN code on each tap |
+| J.4 | wscat join_room | PASS | wscat join_room -> simulator auto-navigated to ChatScreen with [plaintext — encryption arrives in task 9] banner visible |
+| J.5 | Bidirectional messages | PASS | messages flowed both directions (sim -> wscat and wscat -> sim) |
+| J.6 | Close wscat -> peer_left | PASS | closing wscat showed [peer disconnected — room closed] and disabled the composer |
+| J.7 | Reverse direction | PASS | reverse direction worked (app joined a wscat-created room, chat functioned) |
+
+**Bonus:** Backgrounding the app for ~5s -> chat session survives (validates detached-only lifecycle fix). PASS.
+
+### flutter analyze
+No issues found.
+
+### flutter test — 19/19 pass
 
 ### npm test — 29/29 pass
-```
-  GET /health returns 200 with version string
-  GET /nope returns 404
-  WS connects on /ws and receives hello frame
-  WS wrong path is rejected
-  create_room returns a well-formed code
-  second create_room on same socket -> already_in_room
-  bad JSON -> bad_message
-  unknown type -> unknown_type
-  oversized frame -> bad_message
-  disconnect removes the room
-  successful join — joiner gets joined, creator gets peer_joined
-  wrong code -> not_found
-  code with bad format -> bad_message
-  room full — third client rejected
-  cannot join own room
-  joiner already in another room -> already_in_room
-  joiner disconnects -> creator gets peer_left, room removed
-  creator disconnects -> joiner gets peer_left, room removed
-  Relay: A -> B relay
-  Relay: B -> A relay
-  Relay: sender not in a room -> not_in_room
-  Relay: sender unpaired -> not_paired
-  Relay: missing payload -> bad_message
-  Relay: non-string payload -> bad_message
-  Relay: oversized frame -> bad_message, peer receives nothing
-  Relay: server does not modify payload (special chars)
-  Lifecycle: shutdown completes within 500ms with 5 connected clients
-  Lifecycle: heartbeat interval is cleared on shutdown
-  server closes cleanly with open ws client
-tests 29 | pass 29 | fail 0
-```
-
-### Shutdown elapsed time
-~6ms with 5 connected clients (well under 500ms limit).
-
-### Flutter verification
-- `flutter analyze` — No issues found
-- `flutter test` — All tests passed (4/4)
 
 ## Status
 Done
 
 ## Notes
-- `attachWebSocket` now returns `{ wss, teardown }` instead of bare `wss`. The `teardown()` function is called explicitly in `close()` before `server.close()`, ensuring WS clients are terminated and the heartbeat interval cleared before the HTTP server close is awaited. The `httpServer.on('close')` handler remains as a safety net.
-- The 5-second hard timeout in index.js uses `.unref()` so it doesn't itself prevent process exit.
-- Phase 1 is now fully closed. All 6 checklist items marked done.
+- `ChatClient` follows the same `ChangeNotifier` injection pattern as `ThemeController` — passed through constructors, no DI framework.
+- RoomCreatedScreen auto-navigates when `peer_joined` arrives (no manual "Open Chat" button).
+- ChatScreen shows "PLAINTEXT" indicator + warning banner since there's no crypto yet.
+- The PASSWORD field on JoinRoomScreen is visible and typeable but not wired. Helper text and a `// TODO(task-8): wire password to Argon2` code comment mark the integration point.
+- App lifecycle: only `detached` triggers `chatClient.close()`; `paused` (backgrounding) preserves the session — verified manually.

@@ -3,21 +3,21 @@ import 'package:flutter/services.dart';
 import '../tokens/tokens.dart';
 import '../theme/app_theme.dart';
 import '../components/app_scaffold.dart';
-import '../components/app_button.dart';
 import '../components/pulse_dot.dart';
 import '../components/room_code_display.dart';
 import '../components/system_message.dart';
+import '../network/chat_client.dart';
 import 'chat_screen.dart';
 
 class RoomCreatedScreen extends StatefulWidget {
   const RoomCreatedScreen({
     super.key,
     required this.theme,
-    required this.roomCode,
+    required this.chatClient,
   });
 
   final AppTheme theme;
-  final String roomCode;
+  final ChatClient chatClient;
 
   @override
   State<RoomCreatedScreen> createState() => _RoomCreatedScreenState();
@@ -27,16 +27,46 @@ class _RoomCreatedScreenState extends State<RoomCreatedScreen> {
   bool _copied = false;
 
   void _copyCode() {
-    Clipboard.setData(ClipboardData(text: widget.roomCode));
+    final code = widget.chatClient.roomCode;
+    if (code == null) return;
+    Clipboard.setData(ClipboardData(text: code));
     setState(() => _copied = true);
     Future.delayed(const Duration(milliseconds: 1500), () {
       if (mounted) setState(() => _copied = false);
     });
   }
 
+  void _onClientChanged() {
+    if (!mounted) return;
+    if (widget.chatClient.state == ChatConnectionState.paired) {
+      widget.chatClient.removeListener(_onClientChanged);
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => ChatScreen(
+            theme: widget.theme,
+            chatClient: widget.chatClient,
+          ),
+        ),
+      );
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    widget.chatClient.addListener(_onClientChanged);
+  }
+
+  @override
+  void dispose() {
+    widget.chatClient.removeListener(_onClientChanged);
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = widget.theme.palette;
+    final code = widget.chatClient.roomCode ?? '----';
 
     return AppScaffold(
       palette: p,
@@ -54,7 +84,10 @@ class _RoomCreatedScreenState extends State<RoomCreatedScreen> {
                   Row(
                     children: [
                       GestureDetector(
-                        onTap: () => Navigator.of(context).pop(),
+                        onTap: () {
+                          widget.chatClient.close();
+                          Navigator.of(context).pop();
+                        },
                         child: Padding(
                           padding: const EdgeInsets.only(right: AppSpacing.sm),
                           child: Text(
@@ -97,7 +130,7 @@ class _RoomCreatedScreenState extends State<RoomCreatedScreen> {
                     const SizedBox(height: AppSpacing.md + 2),
 
                     RoomCodeDisplay(
-                      code: widget.roomCode,
+                      code: code,
                       palette: p,
                       onCopy: _copyCode,
                     ),
@@ -143,23 +176,6 @@ class _RoomCreatedScreenState extends State<RoomCreatedScreen> {
               ),
             ),
 
-            // ── Bottom buttons ──────────────────────────
-            AppButton(
-              label: 'Open Chat',
-              palette: p,
-              expand: true,
-              sub: 'Locks the code to a single peer',
-              onPressed: () {
-                Navigator.of(context).pushReplacement(
-                  MaterialPageRoute(
-                    builder: (_) => ChatScreen(
-                      theme: widget.theme,
-                      roomCode: widget.roomCode,
-                    ),
-                  ),
-                );
-              },
-            ),
             const SizedBox(height: AppSpacing.xl),
           ],
         ),

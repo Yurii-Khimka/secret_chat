@@ -22,6 +22,7 @@
 - [x] Connection lifecycle + cleanup on disconnect
 
 ### Phase 2 — Security
+- [x] Task 7 — Flutter WS client + real pairing (no crypto yet) (`task/flutter-network-client`)
 - [ ] Argon2 password → key derivation on device
 - [ ] AES-256 message encryption on device
 - [ ] Verify zero server-side logging (no IPs, no payloads, no metadata beyond room code)
@@ -247,3 +248,104 @@ task/server-lifecycle-hardening
 
 ### Status
 Done
+
+---
+
+## Session 2026-05-05 — Flutter network client + real pairing
+
+### Completed
+- Added `web_socket_channel ^3.0.0` dependency (sole new dep)
+- Created `lib/network/`: `server_config.dart`, `protocol.dart` (sealed classes + builders), `chat_client.dart` (ChangeNotifier state machine)
+- Wired HomeScreen: CREATE ROOM calls server, shows CONNECTING... state, pushes RoomCreatedScreen on success
+- Wired RoomCreatedScreen: reads code from ChatClient, listens for peer_joined → auto-navigates to ChatScreen
+- Wired JoinRoomScreen: CONNECT validates code, sends join_room, error mapping table, navigates on paired
+- Wired ChatScreen: live message list from ChatClient, peer_left shows system message + disables composer
+- App lifecycle: paused/detached → chatClient.close() (first piece of "everything deleted on close")
+- 15 protocol unit tests + 4 existing widget tests pass (19 total)
+- Zero payload logging in ChatClient (grep verified)
+- Server tests still 29/29
+
+### Branch
+task/flutter-network-client
+
+### Status
+Done
+
+---
+
+## Session 2026-05-05 — Task 7b — live verification + UX closeout
+
+### Completed
+- PASSWORD field: added `// password gate arrives in task 8` helper text below the field
+- Lifecycle: removed `paused` branch — only `detached` triggers `chatClient.close()`
+- ChatScreen: added plaintext warning banner via extended `SystemMessage` (tone: warning)
+- Extended `SystemMessage` with `SystemMessageTone` enum (muted/warning) — no new component
+- flutter analyze clean, flutter test 19/19, npm test 29/29
+
+### Blocked
+- J.3–J.7 manual verification requires a running simulator — not available in this environment
+
+### Branch
+task/flutter-network-client
+
+### Status
+Partially done — UX fixes complete, manual verification blocked
+
+---
+
+## Session 2026-05-05 — Task 7c — Owner-verified J.3–J.7 PASS, Task 7 closed
+
+### Completed
+- Owner ran J.1–J.7 on iPhone 17 simulator + real server + wscat — all PASS
+- Backgrounding app preserves session (detached-only lifecycle verified)
+- Docs updated to reflect verified status; Task 7 is fully closed
+
+### Branch
+task/flutter-network-client
+
+### Status
+Done
+
+---
+
+## Phase 2 — Confirmed Constraints (locked 2026-05-05)
+
+These decisions are locked for the rest of Phase 2 (Argon2 + AES). Future tasks must not deviate without an explicit Tech Lead / Owner re-decision.
+
+### 1:1 only — no multi-user
+- One chat = exactly two participants. No N-party support, ever.
+- Multi-user is **deferred indefinitely** — out of scope for Phase 2 and Phase 3.
+
+### Phrase model — exact match, no retry
+- Phrase agreed **out-of-band** by users (in person, signal, etc.). The app never handles the agreement.
+- Phrase match is **100% exact, case-sensitive**. No trimming, normalisation, or fuzzy matching.
+- On mismatch: **no retry**. User must leave the room and reconnect from scratch.
+- Mismatch is **visible to both sides** (each side's AES-GCM auth tag fails on the peer's first message).
+
+### Phrase / key — never stored, never exposed
+- Phrase is **never stored** to disk, shared_preferences, keychain, or memory beyond the derivation step.
+- Phrase is **never displayed** in the UI, never copyable, never logged.
+- Derived AES key is **never displayed**, never copyable, never logged, never sent to the server.
+- Salt for Argon2id = **room code** (UTF-8 bytes). Both peers derive the same key independently.
+
+### Terminology (locked — use these exact words in UI and code)
+- **Room code** — `WOLF-7342`-style identifier from server. Sharable. Displayed and copyable in the UI.
+- **Phrase** — the human secret both users type. Never displayed.
+- **Key** — 256-bit AES key derived from `Argon2id(phrase, room_code)`. Never exposed.
+
+### Password mode — toggle on RoomCreatedScreen
+- Default: **OFF** (no-password mode — encrypted with hardcoded default key, equivalent to obfuscation).
+- Toggle lives on the **existing RoomCreatedScreen**. No new configuration screen.
+- Existing nickname feature is preserved as-is.
+- When ON: composer accepts only the phrase as the first message; locks until phrase match is confirmed; unlocks for real chat on success; shows mismatch state on failure.
+
+### UX over server flag for password-mode signalling
+- Joiner is told via **clear UI explanation** on ChatScreen, not a server protocol field.
+- Server protocol is **not extended** with a `password_required` boolean — keep the wire small.
+- A future task may add a server flag if UX proves insufficient; not now.
+
+### Crypto stack
+- **Argon2id**, parameters: `m = 64 MB, t = 3, p = 1, length = 32 bytes`. Salt = room code (UTF-8). Acknowledged: salt is below OWASP 16-byte minimum; accepted because chat is ephemeral and Argon2id cost is the actual barrier.
+- **AES-256-GCM**. **Random 12-byte IV per message**, never reused. IV transmitted alongside ciphertext (not secret).
+- Decryption failure (auth tag mismatch) is caught and surfaced as a UI label, never as a crash.
+- No-password mode uses a **hardcoded 256-bit default key** baked into the binary. UI must clearly state this is not real protection.
