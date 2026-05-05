@@ -4,6 +4,14 @@ _Most recent changes appear at the top._
 
 ---
 
+## 2026-05-05 — Task 7 closed — live verification
+
+- J.3–J.7 PASS on iPhone 17 simulator + real server + wscat
+- Lifecycle survives backgrounding (detached-only fix confirmed)
+- Branch ready for merge at Task 8 start
+- Branch: task/flutter-network-client
+- Commit: docs: close out task 7 — owner-verified J.3–J.7 pass
+
 ## 2026-05-05 — Task 7b: live verification + UX closeout
 
 - PASSWORD field on JoinRoomScreen: added `// password gate arrives in task 8` helper text (muted)

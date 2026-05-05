@@ -290,3 +290,18 @@ task/flutter-network-client
 
 ### Status
 Partially done — UX fixes complete, manual verification blocked
+
+---
+
+## Session 2026-05-05 — Task 7c — Owner-verified J.3–J.7 PASS, Task 7 closed
+
+### Completed
+- Owner ran J.1–J.7 on iPhone 17 simulator + real server + wscat — all PASS
+- Backgrounding app preserves session (detached-only lifecycle verified)
+- Docs updated to reflect verified status; Task 7 is fully closed
+
+### Branch
+task/flutter-network-client
+
+### Status
+Done
