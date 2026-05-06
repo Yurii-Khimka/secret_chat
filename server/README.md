@@ -59,9 +59,16 @@ Frame cap: 16 KB per message.
 - Server does not log `msg` frames in any form.
 - Server stores nothing about the conversation beyond the ws-to-room binding.
 
-## Logging policy
+## Logging contract
 
-The logger MUST NEVER log request bodies, IP addresses, headers, room codes, or anything derived from a client connection. It is for server-lifecycle events only (startup, shutdown, internal errors). This rule is the foundation of the "we cannot read your messages and we don't know who you are" promise.
+The only log lines this server emits are:
+- **Startup**: one line (`server listening on …`) — contains host/port/ws-path, none client-derived.
+- **Shutdown**: one line (`shutting down`) — no client data.
+- **Shutdown timeout**: one line (`shutdown timed out …`) — no client data.
+
+The server logs **zero** client-derived data: no IP addresses, no headers, no URL params, no frame contents, no room codes, no nicknames, no error reasons that echo client input.
+
+This contract is enforced by `server/test/logging.test.js`. Any new `console.*` / `info()` / `warn()` call on the data path will fail that test. If lifecycle lines need to change, update the test's expected line set in the same commit.
 
 ## Lifecycle
 

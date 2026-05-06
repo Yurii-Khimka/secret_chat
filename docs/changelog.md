@@ -4,6 +4,17 @@ _Most recent changes appear at the top._
 
 ---
 
+## 2026-05-06 — Task 12: Zero server-side logging audit
+
+- Static audit: all server/src/ files clean — zero leaks (no console.*, no .remoteAddress, no header access)
+- Created server/test/logging.test.js: lifecycle baseline, data-path silence (full session), error non-leak, static source scan
+- Updated server/README.md "Logging contract" section — references test enforcement
+- Added enforcement comment to ws.js header
+- Tests: npm 43 (was 39), flutter 75 (unchanged)
+- Phase 2 — Security complete
+- Branch: task/server-logging-audit
+- Commit: chore: server logging audit — lock zero-data-path-log contract
+
 ## 2026-05-06 — Task 11: Security cleanup — memory wipe + lifecycle hardening
 
 - Added `zeroBytes(Uint8List?)` helper in crypto.dart

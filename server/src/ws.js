@@ -4,6 +4,8 @@
 // request.socket.remoteAddress, or frame contents. Lifecycle counts only
 // (startup, shutdown). This rule is the foundation of the "we cannot read your
 // messages and we don't know who you are" promise.
+// Enforced by server/test/logging.test.js — that test will fail if a console.log
+// or info() call lands on the data path.
 
 import { WebSocketServer } from 'ws';
 import config from './config.js';
