@@ -4,360 +4,196 @@ _Updated by the Tech Lead chat before each task._
 
 ## Status
 
-**Active task:** Phase 3 / Task 17 — **Activation gate v1: ed25519-signed access codes**.
+**Active task:** Phase 3 / Task 17a — **Fix 6 test timeouts introduced by Task 17**.
 
-V1 of the invite-only access model. A single signed activation code, owner-minted offline, locally verified on first launch. No server, no chains, no expiry. The full long-term direction (delegated trust chains) is intentionally deferred — see project memory `project_invite_only_direction.md` and `project_activation_v1.md`.
+Task 17 closeout reported `flutter test`: 123 total (117 pass + 6 timeouts). The plan required all suites clean. 6 timeouts is a regression from Task 16's 102/102. Task 17a's only job is to identify those 6 tests and get the suite back to a fully clean run, with no test calling `pumpAndSettle` against an unbounded animation.
 
 ## Context
 
-### Threat model & non-goals
+### Diagnosis hypothesis
 
-The activation gate defends against **someone who got the binary outside the private store listing** (sideload of an IPA, leaked APK). It does **not** defend against:
+Task 17 introduced two pieces of code that interact badly with Flutter widget tests:
 
-- A user who got a legitimate code from someone else (sharing is out of scope to prevent — the long-term trust-chain direction tackles this).
-- An attacker who forks the repo, swaps the embedded public key, and rebuilds. They can do that. We accept it — they have to ship a forked binary that the user must install.
-- Process-memory attacks. Out of scope (same threat model as Task 11).
+1. **`Caret` component** — uses a `Timer.periodic` (or `AnimationController.repeat()`) that runs forever. Any test that calls `tester.pumpAndSettle()` on a widget tree containing a `Caret` will time out, because the framework treats the repeating timer as an unsettled animation.
 
-The gate **does** prevent: an unmodified, store-shipped binary from being usable without an owner-issued code.
+2. **`Listenable.merge` in `main.dart`** — should be benign, but if a screen test instantiates the merged builder and the `ActivationController` schedules anything async beyond the awaited `load()`, that can also stall settle calls.
 
-### Crypto
+Hypothesis: all 6 timeouts are in widget tests that pump the new `Caret` directly or via a screen that contains it (HomeScreen hero block, ActivationScreen heading). The fix is at the test-call-site level (use bounded `pump(Duration)` calls instead of `pumpAndSettle`) **and possibly** at the component level (give `Caret` a way to be tick-paused in test environments, if needed).
 
-- Algorithm: **ed25519** (the existing `cryptography` package supports it via `Ed25519()`). No new dependency.
-- **Private key** lives in `tools/keys/activation.private.key` — gitignored. Owner generates it locally with `tools/keygen.dart` and never commits it. Even a collaborator who builds the app cannot mint codes without this file.
-- **Public key** lives as a `const List<int>` in [lib/security/activation_pubkey.dart](../lib/security/activation_pubkey.dart). Committed. The repo ships with a **placeholder** (32 zero bytes) — production builds require the owner to replace it. `verifyActivationCode` returns false unconditionally on the placeholder, so any unmodified-but-unconfigured build is locked.
+This is a hypothesis — Part B confirms or refutes it. Don't act on the diagnosis until Part B finishes.
 
-### Activation code format
+### Result.md phrasing — clean it up too
 
-`<base64url(payload)>.<base64url(signature)>` — two segments separated by a single `.`. Approximately 110–130 ASCII characters total.
+Task 17's result.md described the timeouts as *"pre-existing"*. They are not pre-existing — Task 16 closed at 102/102 clean. They are new failures introduced by Task 17. Task 17a fixes both the failures and the misleading phrasing in changelog.md / result.md if it's been propagated there.
 
-- Payload: JSON object `{"id":"<uuidv4>","iat":<unix-seconds>}`. Bytes are the UTF-8 encoding of the JSON string as emitted by the minter — verifier must NOT re-parse and re-serialize. Verifier decodes the base64url payload to bytes and feeds those bytes to ed25519 as the signed message.
-- Signature: 64 raw ed25519 signature bytes, base64url-encoded.
-- The `iat` field is debug-only (helps the owner remember when a code was minted). It is not enforced at verify time. No expiry in v1.
+### What Task 17a is NOT
 
-### Persistence
-
-`shared_preferences` key `activation.code` stores the **full code string**, not a boolean. On launch, the controller re-verifies it. If verification fails (corrupted, tampered, or public key was rotated by an app update), the persisted entry is cleared and the activation screen is shown again.
-
-Reason: a boolean alone could be flipped by anyone with shared_prefs access; storing the code and re-verifying it makes the persisted state unforgeable without the private key.
-
-### What v1 does NOT include
-
-- No "deactivate" / clear-code option in Settings.
-- No code grouping / dashes in display — paste-only, raw base64url.
-- No expiry, no revocation list, no denylist.
-- No invite-issuing from inside the app.
-- No multiple-codes / multiple-keys support.
-- No remote validation, no health check, no telemetry.
-- No "your code expires in N days" UX.
-- No code distribution mechanism beyond the owner running `tools/mint_code.dart` and DMing the result.
+- Not a redesign of `Caret`. The component is fine; only its testability needs a small lever.
+- Not a refactor of any test that already passes. Touch only what's broken.
+- Not a behavior change. The activation gate's runtime behavior is correct as shipped — Task 17a fixes the test infrastructure that proves it.
 
 ## Read First
 
 - [CLAUDE.md](../CLAUDE.md)
-- [docs/result.md](result.md) — Task 16 closeout
-- [docs/sessions.md](sessions.md) — Phase 3 roadmap
-- [docs/changelog.md](changelog.md)
-- [pubspec.yaml](../pubspec.yaml) — confirm `cryptography` is present (Task 9 added it)
-- [lib/main.dart](../lib/main.dart) — controller composition pattern
-- [lib/theme/theme_controller.dart](../lib/theme/theme_controller.dart) — pattern to mirror for `ActivationController` (load, persist, ChangeNotifier)
-- [lib/network/crypto.dart](../lib/network/crypto.dart) — existing `cryptography` usage style
-- [.gitignore](../.gitignore) — new entries needed
+- [docs/result.md](result.md) — Task 17 closeout (note the "117 pass + 6 timeouts" wording)
+- [docs/changelog.md](changelog.md) — verify whether the 117/6 phrasing leaked into the changelog entry; if so, fix it as part of this task
+- [docs/sessions.md](sessions.md)
+- [lib/components/caret.dart](../lib/components/caret.dart) — Task 16 component, the prime suspect
+- [lib/screens/activation_screen.dart](../lib/screens/activation_screen.dart) — Task 17 screen, contains a Caret
+- [lib/screens/home_screen.dart](../lib/screens/home_screen.dart) — Task 16 caret usage
+- [test/components/caret_test.dart](../test/components/caret_test.dart) — Task 16
+- [test/screens/activation_screen_test.dart](../test/screens/activation_screen_test.dart) — Task 17
+- [test/screens/](../test/screens/) — any other test files; the timeouts may not all be Caret-related
 
 ## Current Task
 
 ### Part A — Branching
 
-1. Switch to `main`. Merge `task/ui-polish-pass-1` into `main` (no fast-forward).
-2. Delete the local `task/ui-polish-pass-1` branch.
-3. Branch off `main` as `task/activation-gate-v1`.
+1. Switch to `main`. Merge `task/activation-gate-v1` into `main` (no fast-forward).
+2. Delete the local `task/activation-gate-v1` branch.
+3. Branch off `main` as `task/test-timeout-fix`.
 
-### Part B — `.gitignore`
+### Part B — Identify the 6 timeouts (read-only diagnosis)
 
-Add to [.gitignore](../.gitignore):
+Run `flutter test --reporter expanded` (or `--reporter json` and pipe through `jq` if more readable). Capture the full output. **Do not fix anything yet.**
 
-```
-# Activation signing keys — never commit.
-tools/keys/
-*.private.key
-```
+For each timing-out test, record:
 
-If `tools/keys/` already exists from a stray local run, that's fine — the gitignore prevents future accidents.
+- File path + test name
+- The widget tree it constructs
+- Whether it contains a `Caret` (directly or via a screen)
+- Whether it calls `pumpAndSettle()` (or `pumpAndSettle(Duration(...))` — even bounded settle can fail if the bound is too short)
+- The exact error message Flutter prints (typically `pumpAndSettle timed out` after 10 minutes — for tests that genuinely hang, the runner kills them at the test-level timeout)
 
-### Part C — Owner-side CLI tools
+Output this table at the top of `result.md` so future-you can see what was actually broken. Don't compress the diagnosis — it's the load-bearing artifact for this task.
 
-Create `tools/keygen.dart`:
+If the count doesn't equal 6 (e.g. 4 timeouts, or 8), say so explicitly. Trust the run, not the prior report.
 
-```
-Usage: dart run tools/keygen.dart
+### Part C — Decide the fix shape
 
-Generates a fresh ed25519 keypair. Writes the private key (raw 32 bytes,
-hex-encoded with a trailing newline) to tools/keys/activation.private.key.
-Refuses to overwrite an existing file. Prints the public key as a Dart
-array literal ready to paste into lib/security/activation_pubkey.dart.
-```
+Given the diagnosis, pick one of these patterns per test:
 
-Create `tools/mint_code.dart`:
+#### Pattern 1 — Bounded `pump`, no `pumpAndSettle`
 
-```
-Usage: dart run tools/mint_code.dart [--id=<custom-id>]
-
-Reads tools/keys/activation.private.key. Generates a payload {id, iat}
-(id auto-generated UUIDv4 if not provided), signs it, prints the
-activation code as <base64url(payload)>.<base64url(signature)> on stdout.
-Nothing else on stdout — script output is paste-ready.
-```
-
-Implementation notes:
-
-- Both tools are pure Dart, run with `dart run`, and import `package:cryptography/cryptography.dart`. They are **never** imported by the app — Flutter analysis will not pick them up. To prevent accidental imports, place them under `tools/` (not `lib/`) and add a `// ignore_for_file: avoid_print` comment at the top.
-- Use `Ed25519()` from `cryptography`. `newKeyPair()` for keygen; `sign(bytes, keyPair: ...)` for mint.
-- Private key extraction: `await keyPair.extractPrivateKeyBytes()` returns the 32-byte seed (cryptography package convention). Hex-encode for storage.
-- For `mint_code.dart`, generate UUIDv4 inline using `Random.secure()` — avoid pulling in a `uuid` package dependency for ten lines of code.
-- Refuse-to-overwrite: `keygen.dart` exits with status 1 and a printed warning if the private key file exists. The owner can manually delete it if they really want a new keypair.
-
-These tools have **no tests**. They are scripts the owner runs locally; correctness is verified end-to-end by the activation tests in Part F using a runtime-generated keypair.
-
-### Part D — Embedded public key + verifier
-
-Create [lib/security/activation_pubkey.dart](../lib/security/activation_pubkey.dart):
+For tests that just need to render the widget and inspect output:
 
 ```dart
-/// Public key for verifying activation codes.
-///
-/// Replace the 32-byte placeholder below with your production public key
-/// before shipping a release build. Run `dart run tools/keygen.dart` to
-/// generate a fresh keypair; paste the printed array into [activationPublicKey].
-///
-/// The placeholder (all zeros) causes [verifyActivationCode] to reject every
-/// code, intentionally locking the app until configured.
-const List<int> activationPublicKey = <int>[
-  0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0,
-];
+await tester.pumpWidget(MyWidget());
+await tester.pump(); // initial frame
+// assertions
 ```
 
-Create [lib/security/activation.dart](../lib/security/activation.dart):
+If the widget animates and you want to assert post-animation state, pump explicit durations:
 
 ```dart
-/// Verifies an activation code against the embedded public key.
-/// Returns false on any error (malformed, wrong-length signature, bad signature,
-/// placeholder pubkey). Does not throw.
-Future<bool> verifyActivationCode(String code) async { ... }
+await tester.pump(const Duration(milliseconds: 600));
 ```
 
-Implementation notes:
+Never `pumpAndSettle` against a `Timer.periodic` or `AnimationController.repeat()`. It will not settle.
 
-- The `code` argument is trimmed and whitespace-stripped before parsing (paste hygiene).
-- Reject if pubkey is all zeros (the placeholder). This is a fast-path: if the binary hasn't been configured, every code fails.
-- Split on the first `.` only (be lenient if base64url somehow contained a `.` — it can't, but defensive parsing is cheap).
-- Decode base64url with `base64Url` from `dart:convert`. Tolerate missing padding (`base64Url.normalize`).
-- Signature must be exactly 64 bytes; reject otherwise.
-- Use `Ed25519().verify(payloadBytes, signature: Signature(sigBytes, publicKey: SimplePublicKey(pubkeyBytes, type: KeyPairType.ed25519)))`.
-- Wrap the entire body in `try/catch` returning false on any thrown exception.
-- Add a `@visibleForTesting` mechanism to override the embedded public key in tests:
-  ```dart
-  List<int>? _testPublicKeyOverride;
-  @visibleForTesting
-  void setActivationPublicKeyForTesting(List<int>? bytes) {
-    _testPublicKeyOverride = bytes;
-  }
-  // Internal: List<int> _activeKey() => _testPublicKeyOverride ?? activationPublicKey;
-  ```
-  Tests reset to `null` in `tearDown`.
+#### Pattern 2 — Wrap the test body in `runAsync`
 
-Do NOT log the code, the payload, or the signature anywhere. No `debugPrint` calls.
-
-### Part E — `ActivationController`
-
-Create [lib/security/activation_controller.dart](../lib/security/activation_controller.dart):
+For tests that involve genuine async work (e.g. `SharedPreferences`-mocked controller flows), `runAsync` runs real-time async with a real clock. Combined with explicit `pump` calls, this avoids settle-loops:
 
 ```dart
-class ActivationController extends ChangeNotifier {
-  static const _prefsKey = 'activation.code';
-  bool _activated = false;
-  String? _error;
+await tester.runAsync(() async {
+  await controller.activate(code);
+});
+await tester.pump();
+```
 
-  bool get activated => _activated;
-  String? get error => _error;
+#### Pattern 3 — Component-level test seam (only if needed)
 
-  /// Loads any persisted code and re-verifies it. Called once at app startup
-  /// before runApp(). If the persisted code fails to verify (corrupted,
-  /// tampered, or pubkey rotated), it is cleared.
-  Future<void> load() async { ... }
+If multiple tests need to render the Caret without its animation, add an opt-out to the component:
 
-  /// Verifies [code]; on success persists it and flips activated to true.
-  /// On failure sets [error] = '[ERROR] code not valid' and returns false.
-  Future<bool> activate(String code) async { ... }
+```dart
+class Caret extends StatefulWidget {
+  const Caret({
+    super.key,
+    required this.palette,
+    this.color,
+    this.height = 22,
+    this.width = 10,
+    @visibleForTesting this.disableAnimation = false,
+  });
+  final bool disableAnimation;
+  // ...
 }
 ```
 
-Implementation notes:
+The `_CaretState` checks `widget.disableAnimation` in `initState` and skips starting the timer/controller. The visible block stays rendered (so geometry tests still work) but never blinks.
 
-- Mirror `ThemeController.load()` shape (already exists; check that file for the exact `SharedPreferences` pattern).
-- `activate()` trims input and runs the same `verifyActivationCode`. On success: clear `_error`, set `_activated = true`, persist the cleaned code, `notifyListeners()`. On failure: set `_error`, leave `_activated` alone, `notifyListeners()`.
-- `error` is cleared automatically when the user starts editing again — but that's screen-level UX, not controller logic. Don't clear it inside the controller on `activate()` until success.
-- Do not include the code in any error string. The single error is `'[ERROR] code not valid'`.
-- No analytics, no telemetry, no logging.
+This is a real production-code change, so use it only if Patterns 1–2 can't cleanly fix the affected tests. **Default to Patterns 1–2.** Don't add a test seam if you don't need it.
 
-### Part F — `ActivationScreen`
+### Part D — Apply fixes
 
-Create [lib/screens/activation_screen.dart](../lib/screens/activation_screen.dart). Terminal aesthetic, matching the rest of the app.
+For each broken test from Part B, apply Pattern 1 or 2. If you reach for Pattern 3, justify it in result.md (which test, why bounded pump didn't work).
 
-Layout (top to bottom):
+Constraints:
+- Touch only the failing test files (and `caret.dart` if Pattern 3 applies).
+- Do not change any production logic in ActivationController, ActivationScreen, HomeScreen, or main.dart.
+- Do not change any *passing* test.
 
-1. TermHeader-style top bar: PulseDot + `ACCESS CODE` on the left, no right-side text.
-2. Hero block (mirrors HomeScreen's hero):
-   - Section label `// ACTIVATION` in caption muted.
-   - One-line heading `Invite required` in heading-primary, with a blinking `Caret` after it (reuse the Caret component from Task 16).
-   - Body micro-text: `paste the access code you were sent. it's tied to this app, not to your identity.` (Trust framing per the locked direction memory.)
-3. A multi-line `TextField` that accepts paste. Monospace, 4–6 lines tall, soft-wrap. Hint text: `paste activation code…`.
-4. Below: an "ACTIVATE" button (full-width, primary). Disabled when input is empty.
-5. Error text below the button when `controller.error != null`, in `palette.warning`. The error clears as soon as the user edits the field.
-6. Footer micro-text: `NOTHING IS SAVED · NOTHING IS LOGGED` (matches HomeScreen's footer).
+### Part E — Re-run and verify
 
-Behavior:
+1. `flutter test` — full pass, no timeouts. Count should be exactly 123 (or whatever Part B observed).
+2. Run twice in a row to catch flakes — animation-driven tests are a classic flake source. If a test passes once and fails once, it's not fixed; revisit Part C and apply Pattern 3 to that specific test.
+3. `flutter analyze` — clean. New `@visibleForTesting` annotations require `import 'package:meta/meta.dart';` if not already.
+4. `npm test` — unchanged, 43.
 
-- On ACTIVATE: trim & whitespace-strip the input, call `controller.activate(...)`. If true, the screen does nothing — `main.dart`'s AnimatedBuilder will swap to HomeScreen. If false, error renders below.
-- The TextField listener clears `controller._error` when input changes (call a public `clearError()` method on the controller — add one in Part E, single-line).
-- No "back" button. There's nothing to go back to until activated.
-- No "deactivate" affordance anywhere.
+### Part F — Documentation cleanup
 
-Reuse existing components: `AppScaffold`, `AppButton`, `Caret`, `PulseDot`, `AppTypography`. No new components.
+In [docs/changelog.md](changelog.md), find the Task 17 entry. If it carried forward the misleading phrasing `117 pass + 6 pre-existing timeouts`, replace it with the truth:
 
-### Part G — Wire `main.dart`
+```
+- Tests: flutter 123/123 (Task 17 introduced 6 timeouts, fixed in Task 17a)
+```
 
-In [lib/main.dart](../lib/main.dart):
+Or merge the entries — your choice. The reader of the changelog should not come away thinking those timeouts were preexisting.
 
-1. Add `final activationController = ActivationController();` next to the existing `themeController` and `chatClient`.
-2. In `main()`: `await activationController.load();` after the theme load.
-3. Pass `activationController` to `SecretChatApp`.
-4. In `SecretChatApp.build`, the `AnimatedBuilder` listens to **both** controllers (use `Listenable.merge([themeController, activationController])`). Then:
-   ```dart
-   home: activationController.activated
-       ? HomeScreen(theme: theme, controller: themeController, chatClient: widget.chatClient)
-       : ActivationScreen(theme: theme, controller: activationController),
-   ```
-5. Lifecycle handler is unchanged — `detached` still calls `chatClient.close()`. Activation state is decoupled from chat lifecycle.
+In [docs/result.md](result.md) — this task's own result.md will overwrite the Task 17 file, so the misleading phrasing disappears naturally.
 
-### Part H — Tests
+In [docs/sessions.md](sessions.md), do not add a new line for Task 17a — it's a closeout, not a new feature. Add a short addendum to the Task 17 session entry: `+ Task 17a: fixed 6 test timeouts from Caret animation interaction with pumpAndSettle.`
 
-#### Pure-verification tests
-[test/security/activation_test.dart](../test/security/activation_test.dart):
-
-- Round-trip: generate a fresh keypair at runtime, sign a payload, build the code string, override the test pubkey, assert `verifyActivationCode` returns true.
-- Wrong key: sign with key A, verify with key B → false.
-- Tampered payload: sign correctly, then flip a bit in the payload base64 → false.
-- Tampered signature: same with signature → false.
-- Malformed code (no `.`, multiple `.`, empty, whitespace-only) → false.
-- Wrong signature length → false.
-- Placeholder pubkey (all zeros) → false even with an otherwise-valid signature (because verification cannot succeed against a zero key).
-- Whitespace tolerance: code with leading/trailing whitespace and embedded newlines verifies correctly after the controller's clean step. (Test `activate` rather than `verifyActivationCode` for this one.)
-
-#### Controller tests
-[test/security/activation_controller_test.dart](../test/security/activation_controller_test.dart):
-
-- `load()` with empty prefs → `activated == false`.
-- `load()` with valid persisted code → `activated == true`.
-- `load()` with tampered persisted code → `activated == false` AND prefs cleared.
-- `activate()` with valid code → returns true, `activated == true`, code persisted.
-- `activate()` with invalid code → returns false, `activated == false`, `error == '[ERROR] code not valid'`, prefs unchanged.
-- `clearError()` resets `error` to null without touching `activated`.
-
-Use `SharedPreferences.setMockInitialValues({})` to drive prefs state.
-
-#### Screen tests
-[test/screens/activation_screen_test.dart](../test/screens/activation_screen_test.dart):
-
-- ACTIVATE button is disabled with empty input.
-- After typing → button enabled. After tapping with valid code (with override pubkey set) → controller.activated flips true.
-- With invalid code → error text renders.
-- Editing the field after an error clears the error text.
-
-#### Existing tests
-- `flutter test` count grows from 102. Confirm. No existing tests should break — `main.dart` changes don't affect the chat-flow tests because they construct screens directly with a `ChatClient`.
-
-### Part I — Documentation
-
-Update [docs/readme.md](readme.md):
-
-Add a new section `## Activation (v1)` near the top, ~10 lines:
-
-- The app requires an owner-issued activation code on first launch.
-- Codes are signed with an ed25519 private key kept offline by the project owner.
-- Public key is embedded in the binary. Bypass requires forking and rebuilding.
-- For collaborators who build the app: `dart run tools/keygen.dart` (once) → paste the printed public key into `lib/security/activation_pubkey.dart` → `dart run tools/mint_code.dart` per code → DM codes to invitees.
-- The placeholder pubkey shipped in the repo locks the app — production builds must replace it.
-
-Do NOT include the activation flow in `readme.md`'s public-facing security table — that table is for end-users and the activation step is invisible to them after first launch.
-
-Do NOT update `chat.md` or `claude.md` — those govern the dev workflow, unchanged.
-
-### Part J — `flutter analyze`, `flutter test`, `npm test`
-
-All clean. Flutter test count grows from 102. Server tests stay at 43 (no server changes).
-
-### Part K — Commit
+### Part G — Commit
 
 One commit:
 
-`feat: activation gate v1 — ed25519-signed access codes`
+`fix: stabilize widget tests around blinking caret animation`
 
-Stage:
-- `.gitignore`
-- `tools/keygen.dart`, `tools/mint_code.dart`
-- `lib/security/activation_pubkey.dart`, `lib/security/activation.dart`, `lib/security/activation_controller.dart`
-- `lib/screens/activation_screen.dart`
-- `lib/main.dart`
-- `test/security/*.dart`, `test/screens/activation_screen_test.dart`
-- `docs/readme.md`
-- `docs/result.md`, `docs/sessions.md`, `docs/changelog.md`
+Stage only the test files and possibly `lib/components/caret.dart` (if Pattern 3 was used). Plus the doc files.
 
-Do **not** stage:
-- Anything under `tools/keys/` (gitignored, shouldn't appear, but double-check).
+### Part H — Output (in your response and at the top of `result.md`)
 
-### Part L — Output (in your response and at the top of `result.md`)
+- The diagnosis table from Part B (the 6 — or however many — broken tests, named).
+- Which Pattern was used for each.
+- Whether Pattern 3 (component-level seam) was added — yes/no, and why if yes.
+- `flutter test` result on two consecutive runs (both must be clean).
+- `flutter analyze` clean.
+- `npm test` 43 unchanged.
+- `git diff --name-only main..HEAD` — expect: test files only, possibly `caret.dart`, plus doc files. **No** changes to `activation_*.dart`, `main.dart`, `home_screen.dart`, `chat_*.dart`.
 
-- Confirm `flutter analyze` clean.
-- `flutter test` count vs. Task 16's 102.
-- `npm test` count (expect unchanged: 43).
-- `git diff --name-only main..HEAD` — expect new `tools/`, new `lib/security/`, new `lib/screens/activation_screen.dart`, modified `lib/main.dart`, `.gitignore`, plus tests + docs.
-- Confirm `tools/keys/` is **not** in the diff. If it is, you accidentally staged a key — abort, remove, redo.
-- Confirm the placeholder pubkey is all zeros and `verifyActivationCode` returns false against it (one of the tests asserts this — confirm it passed).
-- A note on the Caret component reuse on ActivationScreen — the heading "Invite required" should have a blinking caret after it.
+### Part I — Update docs/result.md, docs/sessions.md, docs/changelog.md
 
-### Part M — Update docs/result.md, docs/sessions.md, docs/changelog.md
-
-Per CLAUDE.md §4–§6.
-
-In sessions.md, add a new line under Phase 3:
-- [x] Activation gate v1 — ed25519-signed access codes (`task/activation-gate-v1`)
-
-This is a Phase 3 addition that wasn't in the original roadmap; that's fine — the roadmap is a living document.
+Per CLAUDE.md §4–§6, with the corrections in Part F.
 
 ## Specs
 
-- Branch: `task/activation-gate-v1` (off `main`, after merging Task 16).
+- Branch: `task/test-timeout-fix` (off `main`, after merging Task 17).
 - One commit at the end.
-- No new dependencies (`cryptography` already in pubspec).
-- No protocol changes (server is untouched).
-- New components: zero. Reuses Caret, AppButton, AppScaffold, PulseDot.
-- New screen: `ActivationScreen`.
-- Two new top-level directories: `lib/security/`, `tools/`.
+- No new dependencies.
+- No production behavior change. (`Caret`'s `disableAnimation` flag, if added, is a `@visibleForTesting` opt-out — production callers don't pass it, so behavior is unchanged.)
+- Touch only failing tests + possibly `caret.dart`.
 
 ## Do NOT
 
-- Do not commit any private key, hex-encoded or otherwise.
-- Do not log activation codes, payloads, signatures, or public keys (the public key is in source, but don't echo it in `debugPrint`).
-- Do not add a "deactivate" / "reset activation" option in Settings.
-- Do not add expiry handling or denylist logic in v1.
-- Do not add a "request a code" or "contact owner" link — that's a feature for a later task if at all.
-- Do not import `tools/` from `lib/` (it would defeat the purpose; tools must be owner-side only).
-- Do not introduce a `uuid` package dependency for one UUIDv4 — generate inline with `Random.secure()`.
-- Do not change the `cryptography` dependency version.
+- Do not weaken any test that currently passes — no removing assertions to dodge flakes.
+- Do not change the activation flow or any other production logic.
+- Do not add an arbitrary `await Future.delayed(...)` to make a flaky test pass — fix the cause (the unbounded pumpAndSettle), not the symptom.
+- Do not extend the `flutter test` default timeout. The right number is "the test completes," not "the budget is bigger."
+- Do not add new tests in this task. Closeout, not expansion.
 - Do not push the branch.
 
 ## Commit Message
 
-`feat: activation gate v1 — ed25519-signed access codes`
+`fix: stabilize widget tests around blinking caret animation`

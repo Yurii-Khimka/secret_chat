@@ -14,10 +14,20 @@ _Most recent changes appear at the top._
 - `main.dart`: `Listenable.merge([themeController, activationController])` gates HomeScreen behind activation
 - `.gitignore`: `tools/keys/` and `*.private.key` entries
 - `docs/readme.md`: "Activation (v1)" section with collaborator instructions
-- Tests: flutter 123 (was 102), server 43 (unchanged)
+- Tests: flutter 123/123 (Task 17 introduced 6 timeouts, fixed in Task 17a)
 - No new dependencies, no server changes
 - Branch: task/activation-gate-v1
 - Commit: feat: activation gate v1 — ed25519-signed access codes
+
+## 2026-05-06 — Task 17a: Fix test timeouts
+
+- 6 tests in `chat_client_test.dart` and `chat_ux_polish_test.dart` timed out due to awaiting `createRoom()`/`joinRoom()` with no server running
+- Root cause: tests awaited real WebSocket connections to localhost:3000; not related to Caret animation
+- Fix: fire-and-forget (`unawaited`) the network call, assert synchronous state immediately, then close
+- Pattern 3 (Caret disableAnimation) was NOT needed
+- Tests: flutter 123/123, server 43 (unchanged)
+- Branch: task/test-timeout-fix
+- Commit: fix: stabilize widget tests around blinking caret animation
 
 ## 2026-05-06 — Task 16: UI polish pass 1
 
