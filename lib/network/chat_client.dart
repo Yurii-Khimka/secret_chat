@@ -265,23 +265,32 @@ class ChatClient extends ChangeNotifier {
     }
   }
 
+  /// @visibleForTesting — exposes the raw key bytes so tests can verify zeroing.
+  @visibleForTesting
+  Uint8List? get debugKeyBytes => _key;
+
   Future<void> close() async {
     final channel = _channel;
     _channel = null;
     _subscription?.cancel();
     _subscription = null;
+    _pendingDecrypt.clear();
     _roomCode = null;
     _lastError = null;
     _passwordMode = false;
     _isHost = null;
     _localNickname = null;
+    // Strings are immutable; clearing the list drops references but does not zero memory.
     _messages.clear();
+    zeroBytes(_key);
     _key = null;
     _mismatchDetected = false;
-    _pendingDecrypt.clear();
     _state = ChatConnectionState.idle;
     try {
-      await channel?.sink.close();
+      await Future.any([
+        channel?.sink.close() ?? Future.value(),
+        Future.delayed(const Duration(seconds: 1)),
+      ]);
     } catch (_) {}
     notifyListeners();
   }

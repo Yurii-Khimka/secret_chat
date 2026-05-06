@@ -4,6 +4,19 @@ _Most recent changes appear at the top._
 
 ---
 
+## 2026-05-06 — Task 11: Security cleanup — memory wipe + lifecycle hardening
+
+- Added `zeroBytes(Uint8List?)` helper in crypto.dart
+- `close()`: key bytes zeroed in-place before dropping reference
+- `_pendingDecrypt.clear()` moved to first mutation in close (drop cipher refs ASAP)
+- Socket teardown bounded to 1s via `Future.any` (hung sink won't block UI)
+- Added `@visibleForTesting debugKeyBytes` getter for test verification
+- Comment documenting immutable-string limit on `_messages.clear()`
+- Lifecycle: detached-only policy confirmed unchanged (paused preserves session)
+- Tests: flutter 75 (was 69), server 39 (unchanged)
+- Branch: task/security-cleanup
+- Commit: chore: security cleanup — zero key bytes on close + bounded socket teardown
+
 ## 2026-05-06 — Task 10: Decrypt-failure UX + mismatch composer lock
 
 - ChatClient: `mismatchDetected` one-way flag on first decrypt failure; cleared by `close()`

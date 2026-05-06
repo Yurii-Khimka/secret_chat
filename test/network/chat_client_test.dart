@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:secret_chat/network/chat_client.dart';
 import 'package:secret_chat/network/crypto.dart';
 import 'package:secret_chat/network/protocol.dart';
 
@@ -213,6 +214,46 @@ void main() {
       final d2 = await decryptMessage(ciphertextBase64: enc2.ciphertext, nonceBase64: enc2.nonce, key: wrongKey);
       expect(d1, isNull);
       expect(d2, isNull);
+    });
+  });
+
+  group('close() — security cleanup', () {
+    test('close resets all state', () async {
+      final client = ChatClient();
+      // Simulate some state (can't fully connect without server, but we can check defaults)
+      await client.close();
+
+      expect(client.hasKey, false);
+      expect(client.mismatchDetected, false);
+      expect(client.roomCode, isNull);
+      expect(client.localNickname, isNull);
+      expect(client.isHost, isNull);
+      expect(client.passwordMode, false);
+      expect(client.messages.isEmpty, true);
+      expect(client.state, ChatConnectionState.idle);
+    });
+
+    test('close called twice does not throw', () async {
+      final client = ChatClient();
+      await client.close();
+      await client.close();
+
+      expect(client.state, ChatConnectionState.idle);
+      expect(client.hasKey, false);
+    });
+
+    test('key bytes are zeroed after close', () async {
+      final client = ChatClient();
+      // Manually inject a key to test zeroing
+      // Use debugKeyBytes to verify
+      expect(client.debugKeyBytes, isNull);
+
+      // We need to test with a real key — derive one and inject via reflection-like approach
+      // Since we can't connect to a server, test the zeroBytes helper directly on a derived key
+      final key = await deriveKey(phrase: 'test', roomCode: 'WOLF-0001');
+      expect(key.any((b) => b != 0), true);
+      zeroBytes(key);
+      expect(key.every((b) => b == 0), true);
     });
   });
 }

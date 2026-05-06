@@ -46,6 +46,12 @@ Future<({String nonce, String ciphertext})> encryptMessage({
   );
 }
 
+/// Zeros [bytes] in place. Safe to call on a null reference.
+void zeroBytes(Uint8List? bytes) {
+  if (bytes == null) return;
+  bytes.fillRange(0, bytes.length, 0);
+}
+
 /// Decrypts. Returns null on auth-tag mismatch (wrong key, tampered ciphertext, or malformed input).
 Future<String?> decryptMessage({
   required String ciphertextBase64,
