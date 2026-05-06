@@ -32,7 +32,7 @@
 ### Phase 3 — Polish
 - [x] Connection error handling + retry UX
 - [x] Smooth session management (foreground/background, network drops)
-- [ ] Final terminal-UI pass against design — audit at docs/ui-audit.md (Task 15 · 2026-05-06)
+- [ ] Final terminal-UI pass against design — audit at docs/ui-audit.md (Task 15 · 2026-05-06); first polish pass shipped via task/ui-polish-pass-1 (Task 16)
 - [ ] App store assets (icons, screenshots, privacy copy)
 - [ ] iOS + Android release builds
 
@@ -302,6 +302,26 @@ Partially done — UX fixes complete, manual verification blocked
 
 ### Branch
 task/flutter-network-client
+
+### Status
+Done
+
+---
+
+## Session 2026-05-06 — Task 16: UI polish pass 1
+
+### Completed
+- Caret component (blinking block cursor, 530ms cycle)
+- HomeScreen hero text blinking caret after "No trace"
+- DiagCard line height increased to 1.9 (local override)
+- Code slot `_` placeholder on JoinRoomScreen
+- Character counter `N / 4096` in chat composer footer (warning at 3500+)
+- Step copy simplified: removed "out of band"
+- 7 audit items explicitly rejected with documented reasons
+- Tests: flutter 102/102 (was 97), server 43/43 (unchanged)
+
+### Branch
+task/ui-polish-pass-1
 
 ### Status
 Done

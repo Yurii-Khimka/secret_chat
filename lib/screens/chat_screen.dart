@@ -22,6 +22,8 @@ class ChatScreen extends StatefulWidget {
 }
 
 class _ChatScreenState extends State<ChatScreen> {
+  static const _composerSoftLimit = 3500;
+
   final _inputController = TextEditingController();
   final _scrollController = ScrollController();
   bool _peerLeft = false;
@@ -36,15 +38,21 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  void _onInputChanged() {
+    if (mounted) setState(() {});
+  }
+
   @override
   void initState() {
     super.initState();
     widget.chatClient.addListener(_onClientChanged);
+    _inputController.addListener(_onInputChanged);
   }
 
   @override
   void dispose() {
     widget.chatClient.removeListener(_onClientChanged);
+    _inputController.removeListener(_onInputChanged);
     _inputController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -312,10 +320,24 @@ class _ChatScreenState extends State<ChatScreen> {
                           modeLabel,
                           style: AppTypography.micro.copyWith(color: p.textMuted),
                         ),
-                        Text(
-                          _composerDisabled ? 'TAP ANYWHERE TO EXIT' : 'TAP TO TYPE',
-                          style: AppTypography.micro.copyWith(color: p.textMuted),
-                        ),
+                        Builder(builder: (_) {
+                          final String footerRight;
+                          final Color footerColor;
+                          if (_composerDisabled) {
+                            footerRight = 'TAP ANYWHERE TO EXIT';
+                            footerColor = p.textMuted;
+                          } else if (_inputController.text.isNotEmpty) {
+                            footerRight = '${_inputController.text.length} / 4096';
+                            footerColor = _inputController.text.length > _composerSoftLimit ? p.warning : p.textMuted;
+                          } else {
+                            footerRight = 'TAP TO TYPE';
+                            footerColor = p.textMuted;
+                          }
+                          return Text(
+                            footerRight,
+                            style: AppTypography.micro.copyWith(color: footerColor),
+                          );
+                        }),
                       ],
                     ),
                   ],

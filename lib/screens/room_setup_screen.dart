@@ -298,7 +298,7 @@ class _RoomSetupScreenState extends State<RoomSetupScreen> {
                             _StepRow(n: '02', text: 'Set a nickname (optional)', palette: p),
                             if (_passwordMode) ...[
                               const SizedBox(height: AppSpacing.sm + 2),
-                              _StepRow(n: '03', text: 'Agree on a shared phrase out of band', palette: p),
+                              _StepRow(n: '03', text: 'Agree on a shared phrase', palette: p),
                             ],
                             const SizedBox(height: AppSpacing.sm + 2),
                             _StepRow(

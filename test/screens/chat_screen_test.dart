@@ -171,6 +171,34 @@ void main() {
       expect(find.text('TAP ANYWHERE TO EXIT'), findsOneWidget);
     });
   });
+
+  group('character counter', () {
+    testWidgets('shows N / 4096 when input has text', (tester) async {
+      final client = _FakeChatClient(passwordMode: false);
+
+      await tester.pumpWidget(MaterialApp(
+        home: ChatScreen(theme: theme, chatClient: client),
+      ));
+      await tester.pump();
+
+      // Type some text
+      await tester.enterText(find.byType(TextField), 'hello');
+      await tester.pump();
+
+      expect(find.text('5 / 4096'), findsOneWidget);
+    });
+
+    testWidgets('mismatchDetected overrides counter with TAP ANYWHERE TO EXIT', (tester) async {
+      final client = _FakeChatClient(mismatchDetected: true, passwordMode: false);
+
+      await tester.pumpWidget(MaterialApp(
+        home: ChatScreen(theme: theme, chatClient: client),
+      ));
+      await tester.pump();
+
+      expect(find.text('TAP ANYWHERE TO EXIT'), findsOneWidget);
+    });
+  });
 }
 
 class _FakeChatClient extends ChangeNotifier implements ChatClient {
