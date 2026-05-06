@@ -4,262 +4,206 @@ _Updated by the Tech Lead chat before each task._
 
 ## Status
 
-**Active task:** Phase 3 / Task 13 — **Connection error handling + retry UX**.
+**Active task:** Phase 3 / Task 14 — **Smooth session management: termination reason + foreground/background hardening**.
 
-This is the first Phase 3 task. Phase 2 closed all security objectives; Phase 3 is about polish — making the failure modes legible.
+Task 13 fixed the *pre-pairing* connection failure modes. Task 14 fixes the *post-pairing* ones.
 
-Today the app handles the *happy* network path well, but the *unhappy* paths leak through:
+The single user-visible bug: when the chat session ends, ChatScreen always shows `peer disconnected — room closed`, regardless of whether the peer actually left or *we* lost connection (network flip, OS killing the socket while backgrounded, server crash). That's misleading.
 
-- **No connect timeout.** `WebSocketChannel.connect` + `await channel.ready` can stall indefinitely if the server is unreachable, the network has a black hole, or DNS hangs. The user sees `Connecting…` forever.
-- **RoomSetupScreen has no error surface.** When `chatClient.state == ChatConnectionState.error` while generating, the screen flips `_generating = false` and rebuilds — the button reverts to `Generate Code` with no explanation, no retry guidance, no error string. Pure dead-end.
-- **RoomSetupScreen, post-code, has no drop UX.** If the WS connection dies after the code is generated but before a peer joins, the screen still says `WAITING FOR PEER` indefinitely. The user has no signal that the connection is gone.
-- **Error code mapping is duplicated and inconsistent** between [join_room_screen.dart](../lib/screens/join_room_screen.dart) (a `_errorMessages` map) and [room_setup_screen.dart](../lib/screens/room_setup_screen.dart) (no mapping at all).
-
-Task 13 fixes those four. It does **not** add auto-reconnect — Phase 2's locked constraint is *"Either disconnect destroys room, survivor gets peer_left"*, so once paired, drops are terminal and only need a clean exit. Auto-reconnect is meaningful only for the *pre-pairing* phase, and even there we go with manual retry rather than silent retry — the user should always know there was a connection issue.
+The single behavioral question: should backgrounding the app close the session? Today's policy (Task 7b decision) is **no — only `detached` closes**. Task 14 confirms this and writes it down explicitly so future tasks don't drift.
 
 ## Context
 
-### Connect-timeout placement
+### What ChatClient knows about *why* it closed
 
-`ChatClient._connect()` is the only place that calls `WebSocketChannel.connect`. A reasonable bound is **8 seconds** — long enough to absorb slow handshakes and TLS negotiation on bad mobile networks, short enough that the user gives up at roughly the same time the app does.
+Today, three code paths flip `state` to `closed`:
 
-Implementation: race `channel.ready` against `Future.delayed(Duration(seconds: 8))`. If the timer wins, set `_lastError = 'connect_timeout'` and `_setState(error)`, and `channel.sink.close()` defensively (the half-open channel must not leak).
+1. [chat_client.dart:90-92](../lib/network/chat_client.dart) — `PeerLeftMsg` arrives. The peer left cleanly (their app sent a close, or the server saw their socket die and notified us as the survivor).
+2. [chat_client.dart:184-188](../lib/network/chat_client.dart) — `_onError` fires. Stream-level error mid-session. Sets `_lastError = 'connection_error'`.
+3. [chat_client.dart:190-194](../lib/network/chat_client.dart) — `_onDone` fires. Stream closed unexpectedly. Sets `_lastError = 'connection_lost'`.
 
-### Error code surface
+Path 1 does **not** set `_lastError` and immediately calls `close()`, which resets `_lastError = null`. So ChatScreen sees `state == closed` and `lastError == null` for case 1, and `lastError != null` for cases 2/3 — but only briefly, until `close()` runs in those paths too.
 
-Current `_lastError` values produced by `ChatClient`:
+We need ChatScreen to make the distinction reliably and survive the `close()` reset.
 
-- `connection_failed` — `WebSocketChannel.connect` threw before `ready`.
-- `connection_error` — stream emitted error mid-session.
-- `connection_lost` — stream closed unexpectedly.
-- `bad_message` — local code-format check failed before sending `join_room`.
-- Plus all server-supplied codes (`not_found`, `room_full`, `cannot_join_own`, `already_in_room`, `not_in_room`, `not_paired`, `bad_request`).
+### The fix: a `ChatTerminationReason`
 
-We are adding **one new code**: `connect_timeout`. No other code surface changes.
+Introduce a small enum on `ChatClient`:
 
-### The retry model
+```dart
+enum ChatTerminationReason { peerLeft, connectionLost }
+```
 
-Manual, explicit, single-tap. No exponential backoff, no auto-attempt. The user sees an error message and a button labeled `Retry`. Tapping `Retry` resets local state (`chatClient.close()` → fresh connect attempt). Code-input fields and nickname survive the retry; the user does not have to re-enter them.
+`peerLeft` covers case 1. `connectionLost` covers cases 2 *and* 3 — the user-visible distinction between "stream errored" and "stream done unexpectedly" is meaningless and we don't want two separate copy strings for them.
 
-### What stays the same
+The reason is set **before** the `closed` state transition that ChatScreen reacts to. It is **preserved** through `close()` and only cleared on the *next* fresh `createRoom` / `joinRoom`. Rationale: ChatScreen reads it after observing `state == closed`, then exits to Home — the user-initiated exit (tapping back / `_goHome`) calls `close()` to tear down, but the screen has already captured what it needs.
 
-- ChatScreen post-pairing behavior is unchanged. `peer_left` / `connection_lost` after pairing → existing exit-to-home flow via the `_peerLeft` UI. (Verify, don't rebuild.)
-- HomeScreen has no connection logic; nothing to change there.
-- Server is unchanged.
-- No new dependencies, no new components, no new tokens.
+Three additional cases to handle correctly:
+
+- **User taps back** while paired (`_goHome` → `close()` → `state == idle`). This is *not* a termination from the user's perspective — they chose to leave. `_terminationReason` stays null.
+- **`detached` lifecycle** (app force-quit). `close()` runs. We don't get to render anything, so the reason value doesn't matter.
+- **Pre-pairing close()** (e.g. user backs out of RoomSetup before generating). `_terminationReason` stays null.
+
+The rule: only the three internal close-triggering paths (`PeerLeftMsg`, `_onError`, `_onDone`) set `_terminationReason`. Explicit user-initiated `close()` does not.
+
+### Lifecycle policy — locked
+
+Confirm and document. No code change to lifecycle handling.
+
+- `paused` (backgrounding via app switcher, lock screen, notification shade): **no close**. Session preserved.
+- `inactive` (incoming call, control center swipe): **no close**.
+- `hidden` (added in newer Flutter): **no close**.
+- `detached` (process going away — force quit, OS reclaim): **close immediately**.
+
+The reason `paused` is preserved: it's a routine UX gesture and breaking the chat there is hostile. The OS or server will notice if the app stays backgrounded long enough that the socket dies — the existing 30s server heartbeat will eventually fire `peer_left` to the surviving peer, and on resume the local app sees `state == closed` with `_terminationReason == connectionLost`. That is correct and adequate.
+
+### What we are NOT doing
+
+- Not adding auto-reconnect post-pairing. Locked constraint.
+- Not extending the wire protocol. The reason is purely client-local.
+- Not adding heartbeat/ping logic on the client. Server already heartbeats every 30s.
+- Not changing the policy. `paused` stays a no-op.
+- Not touching the design / theme. The terminal-UI polish pass is a separate task.
+- Not adding any new screens or components. Copy + state field only.
 
 ## Read First
 
 - [CLAUDE.md](../CLAUDE.md)
-- [docs/result.md](result.md) — Task 12 closeout
+- [docs/result.md](result.md) — Task 13 closeout
 - [docs/sessions.md](sessions.md) — Phase 2 locked constraints + Phase 3 roadmap
 - [docs/changelog.md](changelog.md)
-- [lib/network/chat_client.dart](../lib/network/chat_client.dart) — `_connect`, `_onError`, `_onDone`, error codes
-- [lib/screens/room_setup_screen.dart](../lib/screens/room_setup_screen.dart) — `_onClientChanged`, error path
-- [lib/screens/join_room_screen.dart](../lib/screens/join_room_screen.dart) — `_errorMessages` map (move to shared)
-- [lib/screens/chat_screen.dart](../lib/screens/chat_screen.dart) — verify post-pairing drop behavior
+- [lib/main.dart](../lib/main.dart) — lifecycle observer (verify, don't change)
+- [lib/network/chat_client.dart](../lib/network/chat_client.dart) — `_onData` PeerLeftMsg case, `_onError`, `_onDone`, `close()`
+- [lib/screens/chat_screen.dart](../lib/screens/chat_screen.dart) — `_onClientChanged`, post-pairing drop UX, `peer_left` system message
 - [test/network/chat_client_test.dart](../test/network/chat_client_test.dart)
+- [test/screens/chat_screen_test.dart](../test/screens/chat_screen_test.dart)
 
 ## Current Task
 
 ### Part A — Branching
 
-1. Switch to `main`. Merge `task/server-logging-audit` into `main` (no fast-forward).
-2. Delete the local `task/server-logging-audit` branch.
-3. Branch off `main` as `task/connect-error-ux`.
+1. Switch to `main`. Merge `task/connect-error-ux` into `main` (no fast-forward).
+2. Delete the local `task/connect-error-ux` branch.
+3. Branch off `main` as `task/session-management`.
 
-### Part B — Connect timeout in `ChatClient._connect`
+### Part B — `ChatTerminationReason` enum + state field
 
 In [lib/network/chat_client.dart](../lib/network/chat_client.dart):
 
-1. Add `static const Duration _connectTimeout = Duration(seconds: 8);` (private constant on ChatClient).
-2. Replace the body of `_connect()`:
+1. At the top of the file (above `ChatConnectionState`), add:
    ```dart
-   final channel = WebSocketChannel.connect(ServerConfig.serverUri);
-   try {
-     await channel.ready.timeout(_connectTimeout);
-   } on TimeoutException {
-     try { await channel.sink.close(); } catch (_) {}
-     _lastError = 'connect_timeout';
-     _setState(ChatConnectionState.error);
-     return;
-   } catch (e) {
-     try { await channel.sink.close(); } catch (_) {}
-     _lastError = 'connection_failed';
-     _setState(ChatConnectionState.error);
-     return;
-   }
-   _channel = channel;
-   _subscription = channel.stream.listen(_onData, onError: _onError, onDone: _onDone);
+   enum ChatTerminationReason { peerLeft, connectionLost }
    ```
-   Two notes:
-   - The pre-existing `if (_channel != null) return;` guard at the top stays.
-   - The `setState(connecting)` call before this block stays.
-   - Importing `dart:async` for `TimeoutException` is required if not already imported.
-3. Do not log the failure path. (No new log lines anywhere.)
+2. Add private field `ChatTerminationReason? _terminationReason;` and public getter `ChatTerminationReason? get terminationReason => _terminationReason;`.
+3. Set the reason at the three sites:
+   - In `_onData`'s `PeerLeftMsg` case, set `_terminationReason = ChatTerminationReason.peerLeft;` **before** `_setState(closed)`.
+   - In `_onError`, set `_terminationReason = ChatTerminationReason.connectionLost;` **before** `_setState(error)`.
+   - In `_onDone`, set `_terminationReason = ChatTerminationReason.connectionLost;` **before** `_setState(closed)`.
+4. **Do not** clear `_terminationReason` in `close()`. The field survives close.
+5. **Do** clear `_terminationReason` at the top of `createRoom` and `joinRoom` (a fresh attempt starts with no reason). One line each.
+6. Do not include the reason in any log line. (No new log lines anywhere.)
 
-### Part C — Centralize error-code → message mapping
+### Part C — ChatScreen: distinguish peer-left vs connection-lost
 
-Create [lib/network/error_messages.dart](../lib/network/error_messages.dart) (new file). Single export:
+In [lib/screens/chat_screen.dart](../lib/screens/chat_screen.dart):
 
-```dart
-const Map<String, String> kConnectionErrorMessages = {
-  // Server-supplied codes
-  'not_found':       '[ERROR] no such room',
-  'room_full':       '[ERROR] room is full',
-  'bad_message':     '[ERROR] invalid code',
-  'bad_request':     '[ERROR] bad request',
-  'cannot_join_own': "[ERROR] that's your own code",
-  'already_in_room': '[ERROR] already in a room',
-  'not_in_room':     '[ERROR] not in a room',
-  'not_paired':      '[ERROR] not paired with a peer',
-  // Client-side connection codes
-  'connection_failed': '[ERROR] could not reach server',
-  'connection_error':  '[ERROR] connection error',
-  'connection_lost':   '[ERROR] connection lost',
-  'connect_timeout':   '[ERROR] connection timed out',
-};
+1. Replace the existing single boolean `_peerLeft` with a typed reason that mirrors the client. Two options — pick whichever is cleaner with the existing scaffolding:
+   - **Option A (simpler)**: keep `_peerLeft` as a boolean (true when terminated for *any* reason) plus read `widget.chatClient.terminationReason` directly when rendering copy. Less state, single source of truth for the reason.
+   - **Option B**: store the reason locally as `ChatTerminationReason? _terminatedReason` and snapshot it in `_onClientChanged` when transitioning to closed.
 
-String describeConnectionError(String? code) =>
-    kConnectionErrorMessages[code] ?? '[ERROR] connection failed';
-```
+   Option A is preferred — fewer fields, no risk of drift. The only downside is reading from `widget.chatClient` after a hypothetical further state change, but `terminationReason` is monotonic (once set, only cleared on a fresh `createRoom`/`joinRoom` which won't happen from this screen).
+2. The `peer disconnected — room closed` SystemMessage at the bottom of the message list (currently rendered when `_peerLeft == true`) becomes:
+   - `peerLeft` → `peer disconnected — room closed`
+   - `connectionLost` → `connection lost — room closed`
+   - reason `null` (defensive) → `room closed`
+3. The footer micro-text on the right keeps the same `TAP ANYWHERE TO EXIT` treatment in all three cases.
+4. `_goHome` is unchanged (calls `chatClient.close()` and pops to first route).
 
-Conventions:
-- All strings use the existing `[ERROR] …` lowercased pattern from JoinRoomScreen.
-- `describeConnectionError(null)` returns the generic fallback.
-- Do not import `flutter` here — keep it pure Dart.
+### Part D — Lifecycle policy: comment + test, no code change
 
-### Part D — JoinRoomScreen: use the shared mapping
+In [lib/main.dart](../lib/main.dart):
 
-In [lib/screens/join_room_screen.dart](../lib/screens/join_room_screen.dart):
-
-1. Delete the inline `_errorMessages` map and `_mapError` method.
-2. Import `../network/error_messages.dart`.
-3. Replace the call site with `_error = describeConnectionError(client.lastError);`.
-4. No other behavior change in this screen — it already shows error text and re-enables the button on retry. Confirm the test for join still passes.
-
-### Part E — RoomSetupScreen: surface error + retry on `Generate Code` failure
-
-In [lib/screens/room_setup_screen.dart](../lib/screens/room_setup_screen.dart):
-
-1. Add a `String? _error;` field on `_RoomSetupScreenState`.
-2. In `_generateCode`, set `_error = null` at the top alongside `_generating = true`.
-3. In `_onClientChanged`, replace the `error && _generating` branch with:
+1. Replace the existing one-line comment above `didChangeAppLifecycleState` with:
    ```dart
-   } else if (client.state == ChatConnectionState.error && _generating) {
-     _generating = false;
-     setState(() {
-       _error = describeConnectionError(client.lastError);
-     });
-   }
+   // Lifecycle policy:
+   //   paused / inactive / hidden  →  no-op (routine backgrounding preserves the session)
+   //   detached                    →  close (process going away — wipe everything)
    ```
-4. Render the error inline above the CTA button, mirroring JoinRoomScreen's pattern (warning-tone mono text, small bottom margin). Use the existing `palette.warning` color slot — no new tokens.
-5. The CTA button stays — its label remains `Generate Code` (not `Retry`) on a fresh attempt; tapping it again calls `_generateCode` which already runs `chatClient.close()`-equivalent semantics... **wait, it does not** — the current `_generateCode` does not call `close()` first. Add `await widget.chatClient.close();` before the `addListener` call in `_generateCode` **only when `_error != null`** (i.e. retrying after a failure). On first attempt, `chatClient` is fresh and `close()` is a no-op but unnecessary; calling it is still safe (idempotent per Task 11). Pragmatically: just always call it at the top of `_generateCode`. Simpler and provably correct.
+2. Branch only on `AppLifecycleState.detached`. Do not handle the other states. (This is the current code — verify the diff is just the comment.)
+3. Do not add a "background timeout" or any timer-based auto-close. Out of scope.
 
-   Actually re-examining: the current state machine sets `_state = error` on failure, but `_channel` may still be non-null if the failure was a timeout (we close it, but in the connection_failed catch we currently leave `_channel = null` because we never assigned). The cleanest invariant is: `_generateCode` always starts by calling `chatClient.close()` to guarantee a clean slate, then proceeds. Implement that.
+### Part E — Tests
 
-### Part F — RoomSetupScreen: drop UX after code generated
+In [test/network/chat_client_test.dart](../test/network/chat_client_test.dart), add a group `terminationReason`:
 
-When `_codeGenerated == true` and the connection drops (state transitions to `closed` or `error`) while waiting for a peer:
+- After `PeerLeftMsg` arrives: `terminationReason == ChatTerminationReason.peerLeft`. State is `closed`.
+- After stream error mid-session: `terminationReason == ChatTerminationReason.connectionLost`.
+- After stream closes unexpectedly mid-session: `terminationReason == ChatTerminationReason.connectionLost`.
+- After explicit user `close()` (no preceding internal trigger): `terminationReason == null`.
+- `terminationReason` survives `close()` (set, then call close — still set).
+- `terminationReason` is cleared on next `createRoom` and on next `joinRoom`.
+- Pre-pairing `close()` (user backs out before pairing): `terminationReason == null`.
 
-1. Add a transition handler in `_onClientChanged`:
-   ```dart
-   else if (_codeGenerated &&
-            (client.state == ChatConnectionState.closed ||
-             client.state == ChatConnectionState.error)) {
-     // Connection died before peer joined.
-     setState(() {
-       _error = describeConnectionError(client.lastError ?? 'connection_lost');
-     });
-   }
-   ```
-2. When `_error != null` after code generation: replace the `WAITING FOR PEER` micro-text in the top bar with `CONNECTION LOST`, color `palette.warning`. Replace the bottom CTA spacer with a `Retry` button that runs:
-   ```dart
-   await widget.chatClient.close();
-   setState(() {
-     _codeGenerated = false;
-     _error = null;
-   });
-   // user is back to the pre-generation state with their nickname + password-mode toggle preserved
-   ```
-   The retry resets the screen to its initial step — the *room code* itself is gone (it was server-side state, now destroyed). The user taps `Generate Code` again to get a fresh code.
+In [test/screens/chat_screen_test.dart](../test/screens/chat_screen_test.dart), extend with three widget tests:
 
-   This is intentional UX: you don't get to keep the same code through a reconnect, because the server side has freed it.
-3. Do **not** auto-trigger `Generate Code` after the close. The user has to opt in by tapping.
+- Termination via `peerLeft` renders the system message `peer disconnected — room closed`.
+- Termination via `connectionLost` renders the system message `connection lost — room closed`.
+- Composer is disabled and footer reads `TAP ANYWHERE TO EXIT` in both cases (parameterize if your test framework supports it; two separate tests is also fine).
 
-### Part G — Verify ChatScreen post-pairing drop behavior
+In [test/main_lifecycle_test.dart](../test/main_lifecycle_test.dart) (new file, or wherever lifecycle tests live — check the existing tree first; if no lifecycle test file exists, create this one):
 
-Read-only check, no expected changes:
+- Sending `AppLifecycleState.paused` to the observer does **not** call `chatClient.close()`.
+- Sending `AppLifecycleState.inactive` does not call `close()`.
+- Sending `AppLifecycleState.hidden` does not call `close()`.
+- Sending `AppLifecycleState.detached` calls `close()` exactly once.
 
-- `_onClientChanged` in [chat_screen.dart](../lib/screens/chat_screen.dart) flips `_peerLeft = true` on `state == closed`.
-- `peer_left` and `connection_lost` both arrive as `state == closed` (the former via `PeerLeftMsg` → `_setState(closed)`; the latter via `_onDone` → `_setState(closed)` with `lastError = 'connection_lost'`).
-- The chat screen does not currently distinguish *peer left* from *we lost the connection*. That's fine for this task — both terminate the room. If you observe the system message `peer disconnected — room closed` is misleading when *we* dropped, leave it for a later UX-polish task and note it in result.md.
+If wiring a real `WidgetsBinding` lifecycle test is too heavy, alternative: refactor the lifecycle decision into a small pure function `bool shouldCloseOnLifecycle(AppLifecycleState state) => state == AppLifecycleState.detached;` and unit-test that. The function lives in `main.dart` (or a tiny new `lib/lifecycle.dart` if you prefer separation — pick the smaller diff). Whichever path you pick, the test must lock the policy, not just trace the existing code.
 
-### Part H — Tests
+### Part F — `flutter analyze`, `flutter test`, `npm test`
 
-In [test/network/chat_client_test.dart](../test/network/chat_client_test.dart), add a group `connect timeout`:
+All clean. Flutter test count grows from 81. Server tests stay at 43.
 
-- Mock `WebSocketChannel.connect` to return a channel whose `ready` future never completes (or completes after a controllable duration). Difficult without a fake — if the existing test scaffolding doesn't already support a fake channel, **skip the timeout integration test** and instead unit-test the constant: assert `_connectTimeout` is `Duration(seconds: 8)` via a `@visibleForTesting` getter or a public `static const`. Document in result.md that the timeout is asserted by configuration, not by integration.
-- Idempotent retry: call `joinRoom('FAKE-0000')` against a server that returns `not_found`, then call again. Assert state cleanly resets each attempt and `chatClient.lastError` reflects only the latest call.
-
-In [test/network/error_messages_test.dart](../test/network/error_messages_test.dart) (new file):
-
-- Each known code maps to a non-empty `[ERROR] …` string.
-- Unknown code returns the generic fallback.
-- `null` returns the generic fallback.
-
-In [test/screens/](../test/screens/), if a `room_setup_screen_test.dart` exists, add cases:
-
-- On `state == error`, the screen renders the mapped error string and the CTA returns to `Generate Code`.
-- After code-generated state, on a subsequent `state == closed`, `CONNECTION LOST` is shown and the `Retry` button is present.
-
-If the test directory does not yet have a `room_setup_screen_test.dart`, create one — same scaffolding as the chat_screen widget test from Task 10.
-
-### Part I — `flutter analyze`, `flutter test`, `npm test`
-
-All clean. Flutter test count grows from 75. Server tests stay at 43.
-
-### Part J — Commit
+### Part G — Commit
 
 One commit:
 
-`feat: connect-error ux — timeout, mapped errors, retry on room setup`
+`feat: session management — termination reason + lifecycle policy locked`
 
-### Part K — Output (in your response and at the top of `result.md`)
+### Part H — Output (in your response and at the top of `result.md`)
 
 - Confirm `flutter analyze` clean.
-- `flutter test` count vs. Task 12's 75.
+- `flutter test` count vs. Task 13's 81.
 - `npm test` count (expect unchanged: 43).
-- `git diff --name-only main..HEAD` — expect: `chat_client.dart`, new `error_messages.dart`, `join_room_screen.dart`, `room_setup_screen.dart`, new `error_messages_test.dart`, possibly `room_setup_screen_test.dart`, plus `result.md` / `sessions.md` / `changelog.md`.
-- One sentence on whether the post-pairing-drop message in ChatScreen (`peer disconnected — room closed`) feels misleading when *we* dropped, and whether that warrants a tiny copy fix in this task or a separate one.
+- `git diff --name-only main..HEAD` — expect: `chat_client.dart`, `chat_screen.dart`, `main.dart` (comment only), `chat_client_test.dart`, `chat_screen_test.dart`, possibly new lifecycle test file, plus the doc files.
+- One sentence confirming the lifecycle policy is unchanged behaviorally (only the comment changed).
 
-### Part L — Update docs/result.md, docs/sessions.md, docs/changelog.md
+### Part I — Update docs/result.md, docs/sessions.md, docs/changelog.md
 
 Per CLAUDE.md §4–§6.
 
 In sessions.md, tick:
-- [x] Connection error handling + retry UX
+- [x] Smooth session management (foreground/background, network drops)
 
-Leave the rest of Phase 3 unchecked.
+Phase 3 remaining after this task: terminal-UI pass, app store assets, release builds.
 
 ## Specs
 
-- Branch: `task/connect-error-ux` (off `main`, after merging Task 12).
+- Branch: `task/session-management` (off `main`, after merging Task 13).
 - One commit at the end.
 - No new dependencies.
 - No protocol changes.
-- No new components or tokens.
-- No auto-reconnect — manual retry only.
+- No new components, screens, or tokens.
+- No timer-based auto-close.
 
 ## Do NOT
 
-- Do not add exponential backoff or auto-reconnect.
-- Do not change the chat screen's post-pairing drop behavior.
-- Do not add a "preserve room code through reconnect" feature — the room code is server-side state and dies with the connection.
-- Do not log connection failures (no new `debugPrint` calls outside `kDebugMode`-gated lifecycle messages already in place).
-- Do not extend `ChatConnectionState` with new values. The five existing values plus `_lastError` are sufficient.
+- Do not auto-reconnect post-pairing. Locked.
+- Do not extend the wire protocol with a "leaving" signal. Server already broadcasts `peer_left` on socket close.
+- Do not log termination reasons.
+- Do not change `paused`/`inactive`/`hidden` lifecycle handling — those stay no-ops.
+- Do not introduce a "session timeout" or background-after-N-minutes close.
 - Do not push the branch.
 
 ## Commit Message
 
-`feat: connect-error ux — timeout, mapped errors, retry on room setup`
+`feat: session management — termination reason + lifecycle policy locked`

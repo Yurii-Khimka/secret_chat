@@ -258,4 +258,90 @@ void main() {
       expect(ChatClient.connectTimeout, const Duration(seconds: 8));
     });
   });
+
+  group('terminationReason', () {
+    test('PeerLeftMsg sets peerLeft and state closed', () {
+      final client = ChatClient();
+      client.debugSetState(ChatConnectionState.paired);
+
+      client.debugInjectData('{"type":"peer_left"}');
+
+      expect(client.terminationReason, ChatTerminationReason.peerLeft);
+      expect(client.state, ChatConnectionState.idle); // close() runs after, resets to idle
+    });
+
+    test('stream error mid-session sets connectionLost', () {
+      final client = ChatClient();
+      client.debugSetState(ChatConnectionState.paired);
+
+      client.debugInjectError(Exception('socket broke'));
+
+      expect(client.terminationReason, ChatTerminationReason.connectionLost);
+      expect(client.state, ChatConnectionState.error);
+    });
+
+    test('stream closes unexpectedly mid-session sets connectionLost', () {
+      final client = ChatClient();
+      client.debugSetState(ChatConnectionState.paired);
+
+      client.debugInjectDone();
+
+      expect(client.terminationReason, ChatTerminationReason.connectionLost);
+      expect(client.state, ChatConnectionState.closed);
+    });
+
+    test('explicit user close() leaves terminationReason null', () async {
+      final client = ChatClient();
+      client.debugSetState(ChatConnectionState.paired);
+
+      await client.close();
+
+      expect(client.terminationReason, isNull);
+    });
+
+    test('terminationReason survives close()', () async {
+      final client = ChatClient();
+      client.debugSetState(ChatConnectionState.paired);
+
+      // Trigger internal termination
+      client.debugInjectDone();
+      expect(client.terminationReason, ChatTerminationReason.connectionLost);
+
+      // Explicit close — reason persists
+      await client.close();
+      expect(client.terminationReason, ChatTerminationReason.connectionLost);
+    });
+
+    test('terminationReason cleared on next createRoom', () async {
+      final client = ChatClient();
+      client.debugSetState(ChatConnectionState.paired);
+      client.debugInjectDone();
+      expect(client.terminationReason, ChatTerminationReason.connectionLost);
+
+      // createRoom will fail to connect (no server) but still clears the reason
+      await client.close();
+      try { await client.createRoom(); } catch (_) {}
+      expect(client.terminationReason, isNull);
+    });
+
+    test('terminationReason cleared on next joinRoom', () async {
+      final client = ChatClient();
+      client.debugSetState(ChatConnectionState.paired);
+      client.debugInjectDone();
+      expect(client.terminationReason, ChatTerminationReason.connectionLost);
+
+      await client.close();
+      try { await client.joinRoom('WOLF-1234'); } catch (_) {}
+      expect(client.terminationReason, isNull);
+    });
+
+    test('pre-pairing close() leaves terminationReason null', () async {
+      final client = ChatClient();
+      client.debugSetState(ChatConnectionState.connected);
+
+      await client.close();
+
+      expect(client.terminationReason, isNull);
+    });
+  });
 }

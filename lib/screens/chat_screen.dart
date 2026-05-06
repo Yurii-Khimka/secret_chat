@@ -28,7 +28,8 @@ class _ChatScreenState extends State<ChatScreen> {
 
   void _onClientChanged() {
     if (!mounted) return;
-    if (widget.chatClient.state == ChatConnectionState.closed && !_peerLeft) {
+    final s = widget.chatClient.state;
+    if (!_peerLeft && (s == ChatConnectionState.closed || s == ChatConnectionState.error) && widget.chatClient.terminationReason != null) {
       setState(() => _peerLeft = true);
     } else {
       setState(() {});
@@ -218,11 +219,17 @@ class _ChatScreenState extends State<ChatScreen> {
                       ),
                     );
                   }
-                  // peer_left system message
+                  // termination system message
+                  final reason = widget.chatClient.terminationReason;
+                  final terminationText = switch (reason) {
+                    ChatTerminationReason.peerLeft => 'peer disconnected \u2014 room closed',
+                    ChatTerminationReason.connectionLost => 'connection lost \u2014 room closed',
+                    null => 'room closed',
+                  };
                   return Padding(
                     padding: const EdgeInsets.only(bottom: AppSpacing.sm + 2),
                     child: SystemMessage(
-                      text: 'peer disconnected \u2014 room closed',
+                      text: terminationText,
                       palette: p,
                     ),
                   );

@@ -4,6 +4,17 @@ _Most recent changes appear at the top._
 
 ---
 
+## 2026-05-06 — Task 14: Smooth session management
+
+- Added `ChatTerminationReason` enum (`peerLeft`, `connectionLost`) to ChatClient
+- ChatScreen now shows reason-specific termination message instead of always "peer disconnected"
+- Lifecycle policy documented in main.dart comment; extracted `shouldCloseOnLifecycle()` for testability
+- Added `@visibleForTesting` debug hooks for state machine testing without real server
+- No behavioral change to lifecycle handling (detached-only policy confirmed)
+- Tests: flutter 97 (was 81), server 43 (unchanged)
+- Branch: task/session-management
+- Commit: feat: session management — termination reason + lifecycle policy locked
+
 ## 2026-05-06 — Task 13: Connection error handling + retry UX
 
 - ChatClient: 8-second connect timeout (`connect_timeout` error code), bounded `channel.ready`

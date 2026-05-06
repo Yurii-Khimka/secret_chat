@@ -31,7 +31,7 @@
 
 ### Phase 3 — Polish
 - [x] Connection error handling + retry UX
-- [ ] Smooth session management (foreground/background, network drops)
+- [x] Smooth session management (foreground/background, network drops)
 - [ ] Final terminal-UI pass against design
 - [ ] App store assets (icons, screenshots, privacy copy)
 - [ ] iOS + Android release builds
@@ -302,6 +302,22 @@ Partially done — UX fixes complete, manual verification blocked
 
 ### Branch
 task/flutter-network-client
+
+### Status
+Done
+
+---
+
+## Session 2026-05-06 — Task 14: Smooth session management
+
+### Completed
+- ChatTerminationReason enum (peerLeft, connectionLost) on ChatClient
+- ChatScreen: reason-aware termination message (peer disconnected vs connection lost)
+- Lifecycle policy documented and locked via shouldCloseOnLifecycle() pure function
+- Tests: flutter 97/97 (was 81), server 43/43 (unchanged)
+
+### Branch
+task/session-management
 
 ### Status
 Done

@@ -183,6 +183,16 @@ class _FakeChatClient extends ChangeNotifier implements ChatClient {
   bool get mismatchDetected => false;
   @override
   Uint8List? get debugKeyBytes => null;
+  @override
+  ChatTerminationReason? get terminationReason => null;
+  @override
+  void debugInjectData(String frame) {}
+  @override
+  void debugInjectError(Object error) {}
+  @override
+  void debugInjectDone() {}
+  @override
+  void debugSetState(ChatConnectionState s) {}
 
   @override
   Future<void> createRoom({bool passwordMode = false, String? nickname}) async {}
