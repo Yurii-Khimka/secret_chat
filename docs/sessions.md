@@ -32,7 +32,7 @@
 ### Phase 3 — Polish
 - [x] Connection error handling + retry UX
 - [x] Smooth session management (foreground/background, network drops)
-- [ ] Final terminal-UI pass against design
+- [ ] Final terminal-UI pass against design — audit at docs/ui-audit.md (Task 15 · 2026-05-06)
 - [ ] App store assets (icons, screenshots, privacy copy)
 - [ ] iOS + Android release builds
 
@@ -302,6 +302,22 @@ Partially done — UX fixes complete, manual verification blocked
 
 ### Branch
 task/flutter-network-client
+
+### Status
+Done
+
+---
+
+## Session 2026-05-06 — Task 15: UI fidelity audit
+
+### Completed
+- Produced docs/ui-audit.md: 28 deltas (6 High, 14 Medium, 8 Low) across 5 screens and 9 components
+- 7 unimplemented design features catalogued, 3 ambiguities documented
+- 12-item recommended cut for Task 16
+- Zero source files changed
+
+### Branch
+task/ui-audit
 
 ### Status
 Done

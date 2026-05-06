@@ -1,28 +1,30 @@
 # Last Task Result
 
 ## Task
-Phase 3 / Task 14 — Smooth session management: termination reason + foreground/background hardening.
+Phase 3 / Task 15 — UI fidelity audit (read-only delta list).
 
 ## Branch
-task/session-management
+task/ui-audit
 
 ## Commit
-feat: session management — termination reason + lifecycle policy locked
+docs: ui fidelity audit — delta list for task 16
 
 ## What Was Done
 
-- **ChatTerminationReason enum** (`peerLeft`, `connectionLost`): added to `chat_client.dart`. Set before state transition at `PeerLeftMsg`, `_onError`, `_onDone`. Preserved through `close()`, cleared only on next `createRoom`/`joinRoom`.
-- **ChatScreen**: system message now distinguishes `peer disconnected — room closed` (peerLeft) vs `connection lost — room closed` (connectionLost) vs `room closed` (null/defensive). Composer disabled + TAP ANYWHERE TO EXIT in all termination cases.
-- **Lifecycle policy**: comment in `main.dart` updated to document the policy. Extracted `shouldCloseOnLifecycle()` pure function for testability. Behavior unchanged — only `detached` triggers `close()`.
-- **Test hooks**: `debugInjectData`, `debugInjectError`, `debugInjectDone`, `debugSetState` added (`@visibleForTesting`) to drive state machine in tests without a real server.
-- **Tests**: 7 `terminationReason` unit tests, 4 termination UI widget tests, 4 lifecycle policy tests.
+- Produced `docs/ui-audit.md`: per-screen, per-component delta list comparing Flutter implementation against `docs/design/screens.jsx` + `chat1.md`.
+- 28 total deltas: 6 High, 14 Medium, 8 Low.
+- 7 unimplemented features from design catalogued (decorative overlays, caret animation, expiry timer, fingerprint, character counter, lifecycle system messages, fake keyboard).
+- 3 ambiguities documented.
+- 12-item recommended cut for Task 16.
+- Zero source files changed.
 
 ## Status
 Done
 
 ## Notes
-- `flutter analyze`: no issues
-- `flutter test`: 97 tests (up from 81 in Task 13)
-- `npm test`: 43 tests (unchanged)
-- Lifecycle policy is unchanged behaviorally (only the comment changed + function extraction for testability)
-- Changed files: `chat_client.dart`, `chat_screen.dart`, `main.dart` (comment + pure function), `chat_client_test.dart`, `chat_screen_test.dart`, `chat_ux_polish_test.dart` (fake client fix), new `main_lifecycle_test.dart`
+- `flutter analyze`: clean
+- `flutter test`: 97 (unchanged from Task 14)
+- `npm test`: 43 (unchanged)
+- Dirty screens: Home (4 deltas), Room Setup (6), Join Room (4), Chat (10). Settings: clean (no design counterpart).
+- Clean components: AppButton, AppTextField, AppText, AppToggle, MessageBubble, RoomCodeDisplay, SystemMessage, PulseDot. AppScaffold has one delta (missing decorative overlays — listed as unimplemented).
+- `git diff --name-only main..HEAD` shows only `docs/` files — no source changes.
