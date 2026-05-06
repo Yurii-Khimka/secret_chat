@@ -6,6 +6,7 @@ import '../components/app_scaffold.dart';
 import '../components/app_button.dart';
 import '../components/app_text_field.dart';
 import '../network/chat_client.dart';
+import '../network/error_messages.dart';
 import 'chat_screen.dart';
 
 class JoinRoomScreen extends StatefulWidget {
@@ -73,16 +74,6 @@ class _JoinRoomScreenState extends State<JoinRoomScreen> {
     return KeyEventResult.ignored;
   }
 
-  static const _errorMessages = {
-    'not_found': '[ERROR] no such room',
-    'room_full': '[ERROR] room is full',
-    'bad_message': '[ERROR] invalid code',
-    'cannot_join_own': "[ERROR] that's your own code",
-  };
-
-  String _mapError(String? code) {
-    return _errorMessages[code] ?? '[ERROR] connection failed';
-  }
 
   void _onClientChanged() {
     if (!mounted) return;
@@ -101,7 +92,7 @@ class _JoinRoomScreenState extends State<JoinRoomScreen> {
     } else if (client.state == ChatConnectionState.error && _connecting) {
       _connecting = false;
       setState(() {
-        _error = _mapError(client.lastError);
+        _error = describeConnectionError(client.lastError);
       });
     }
   }

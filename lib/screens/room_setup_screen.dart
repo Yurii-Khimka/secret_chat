@@ -10,6 +10,7 @@ import '../components/pulse_dot.dart';
 import '../components/room_code_display.dart';
 import '../components/system_message.dart';
 import '../network/chat_client.dart';
+import '../network/error_messages.dart';
 import 'chat_screen.dart';
 
 class RoomSetupScreen extends StatefulWidget {
@@ -32,6 +33,7 @@ class _RoomSetupScreenState extends State<RoomSetupScreen> {
   bool _generating = false;
   bool _codeGenerated = false;
   bool _copied = false;
+  String? _error;
 
   void _copyCode() {
     final code = widget.chatClient.roomCode;
@@ -48,7 +50,10 @@ class _RoomSetupScreenState extends State<RoomSetupScreen> {
     final client = widget.chatClient;
     if (client.state == ChatConnectionState.connected && _generating) {
       _generating = false;
-      setState(() => _codeGenerated = true);
+      setState(() {
+        _codeGenerated = true;
+        _error = null;
+      });
     } else if (client.state == ChatConnectionState.paired) {
       client.removeListener(_onClientChanged);
       Navigator.of(context).pushReplacement(
@@ -61,18 +66,38 @@ class _RoomSetupScreenState extends State<RoomSetupScreen> {
       );
     } else if (client.state == ChatConnectionState.error && _generating) {
       _generating = false;
-      setState(() {});
+      setState(() {
+        _error = describeConnectionError(client.lastError);
+      });
+    } else if (_codeGenerated &&
+        (client.state == ChatConnectionState.closed ||
+         client.state == ChatConnectionState.error)) {
+      setState(() {
+        _error = describeConnectionError(client.lastError ?? 'connection_lost');
+      });
     }
   }
 
   Future<void> _generateCode() async {
-    setState(() => _generating = true);
+    await widget.chatClient.close();
+    setState(() {
+      _generating = true;
+      _error = null;
+    });
     widget.chatClient.addListener(_onClientChanged);
     await widget.chatClient.createRoom(
       passwordMode: _passwordMode,
       nickname: _nicknameController.text,
     );
     _onClientChanged();
+  }
+
+  void _retryAfterDrop() async {
+    await widget.chatClient.close();
+    setState(() {
+      _codeGenerated = false;
+      _error = null;
+    });
   }
 
   @override
@@ -92,6 +117,7 @@ class _RoomSetupScreenState extends State<RoomSetupScreen> {
   Widget build(BuildContext context) {
     final p = widget.theme.palette;
     final code = widget.chatClient.roomCode ?? '----';
+    final hasDropError = _codeGenerated && _error != null;
 
     return AppScaffold(
       palette: p,
@@ -116,7 +142,7 @@ class _RoomSetupScreenState extends State<RoomSetupScreen> {
                         child: Padding(
                           padding: const EdgeInsets.only(right: AppSpacing.sm),
                           child: Text(
-                            '‹',
+                            '\u2039',
                             style: AppTypography.heading.copyWith(
                               color: p.textMuted,
                               fontSize: 18,
@@ -134,8 +160,10 @@ class _RoomSetupScreenState extends State<RoomSetupScreen> {
                   ),
                   if (_codeGenerated)
                     Text(
-                      'WAITING FOR PEER',
-                      style: AppTypography.caption.copyWith(color: p.textMuted),
+                      hasDropError ? 'CONNECTION LOST' : 'WAITING FOR PEER',
+                      style: AppTypography.caption.copyWith(
+                        color: hasDropError ? p.warning : p.textMuted,
+                      ),
                     ),
                 ],
               ),
@@ -198,14 +226,14 @@ class _RoomSetupScreenState extends State<RoomSetupScreen> {
                     AppTextField(
                       palette: p,
                       controller: _nicknameController,
-                      placeholder: 'e.g. a.b. · knight · m',
+                      placeholder: 'e.g. a.b. \u00b7 knight \u00b7 m',
                       prefixChar: '@',
                       enabled: !_codeGenerated,
                       maxLength: 24,
                     ),
                     const SizedBox(height: AppSpacing.sm),
                     Text(
-                      '// optional — visible only to you (peer-visible nicknames arrive later)',
+                      '// optional \u2014 visible only to you (peer-visible nicknames arrive later)',
                       style: AppTypography.caption.copyWith(color: p.textMuted),
                     ),
 
@@ -275,7 +303,7 @@ class _RoomSetupScreenState extends State<RoomSetupScreen> {
                             const SizedBox(height: AppSpacing.sm + 2),
                             _StepRow(
                               n: _passwordMode ? '04' : '03',
-                              text: 'Wait — peer will appear here',
+                              text: 'Wait \u2014 peer will appear here',
                               palette: p,
                               live: true,
                             ),
@@ -288,7 +316,16 @@ class _RoomSetupScreenState extends State<RoomSetupScreen> {
               ),
             ),
 
-            // ── Generate Code CTA ──────────────────────
+            // ── Error text ─────────────────────────────
+            if (_error != null && !_codeGenerated) ...[
+              Text(
+                _error!,
+                style: AppTypography.mono.copyWith(color: p.warning),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+            ],
+
+            // ── CTA ──────────────────────────────────
             if (!_codeGenerated) ...[
               AppButton(
                 label: _generating ? 'Connecting...' : 'Generate Code',
@@ -296,6 +333,19 @@ class _RoomSetupScreenState extends State<RoomSetupScreen> {
                 expand: true,
                 enabled: !_generating,
                 onPressed: _generating ? null : _generateCode,
+              ),
+              const SizedBox(height: AppSpacing.xl),
+            ] else if (hasDropError) ...[
+              Text(
+                _error!,
+                style: AppTypography.mono.copyWith(color: p.warning),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              AppButton(
+                label: 'Retry',
+                palette: p,
+                expand: true,
+                onPressed: _retryAfterDrop,
               ),
               const SizedBox(height: AppSpacing.xl),
             ] else
