@@ -1,31 +1,28 @@
 # Last Task Result
 
 ## Task
-Phase 3 / Task 13 — Connection error handling + retry UX.
+Phase 3 / Task 14 — Smooth session management: termination reason + foreground/background hardening.
 
 ## Branch
-task/connect-error-ux
+task/session-management
 
 ## Commit
-feat: connect-error ux — timeout, mapped errors, retry on room setup
+feat: session management — termination reason + lifecycle policy locked
 
 ## What Was Done
 
-- **ChatClient._connect()**: 8-second timeout on `channel.ready`. On timeout: close half-open channel, set `lastError = 'connect_timeout'`, transition to error state. On other connect failures: same cleanup.
-- **error_messages.dart** (new): Centralized `kConnectionErrorMessages` map + `describeConnectionError()` helper. All known codes (server + client-side) mapped to `[ERROR] …` strings.
-- **JoinRoomScreen**: Deleted inline `_errorMessages` map and `_mapError`; now uses shared `describeConnectionError`.
-- **RoomSetupScreen**:
-  - Error surface: `_error` field renders mapped error above CTA on generate-failure.
-  - `_generateCode` calls `chatClient.close()` first for clean-slate retry.
-  - Post-code drop: when connection dies after code generated but before peer joins, shows `CONNECTION LOST` in header + error text + `Retry` button that resets to pre-generation state.
-- **Tests**: error_messages_test.dart (5 tests), connect timeout constant assertion (1 test).
+- **ChatTerminationReason enum** (`peerLeft`, `connectionLost`): added to `chat_client.dart`. Set before state transition at `PeerLeftMsg`, `_onError`, `_onDone`. Preserved through `close()`, cleared only on next `createRoom`/`joinRoom`.
+- **ChatScreen**: system message now distinguishes `peer disconnected — room closed` (peerLeft) vs `connection lost — room closed` (connectionLost) vs `room closed` (null/defensive). Composer disabled + TAP ANYWHERE TO EXIT in all termination cases.
+- **Lifecycle policy**: comment in `main.dart` updated to document the policy. Extracted `shouldCloseOnLifecycle()` pure function for testability. Behavior unchanged — only `detached` triggers `close()`.
+- **Test hooks**: `debugInjectData`, `debugInjectError`, `debugInjectDone`, `debugSetState` added (`@visibleForTesting`) to drive state machine in tests without a real server.
+- **Tests**: 7 `terminationReason` unit tests, 4 termination UI widget tests, 4 lifecycle policy tests.
 
 ## Status
 Done
 
 ## Notes
 - `flutter analyze`: no issues
-- `flutter test`: 81 tests (up from 75 in Task 12)
+- `flutter test`: 97 tests (up from 81 in Task 13)
 - `npm test`: 43 tests (unchanged)
-- ChatScreen post-pairing drop: "peer disconnected — room closed" message is slightly misleading when *we* drop connection (not peer). Left for a later UX-polish task — both cases terminate the room so the flow is correct, just the copy could be refined.
-- No auto-reconnect — manual retry only, per spec.
+- Lifecycle policy is unchanged behaviorally (only the comment changed + function extraction for testability)
+- Changed files: `chat_client.dart`, `chat_screen.dart`, `main.dart` (comment + pure function), `chat_client_test.dart`, `chat_screen_test.dart`, `chat_ux_polish_test.dart` (fake client fix), new `main_lifecycle_test.dart`

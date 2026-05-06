@@ -5,6 +5,8 @@ import 'server_config.dart';
 import 'protocol.dart';
 import 'crypto.dart';
 
+enum ChatTerminationReason { peerLeft, connectionLost }
+
 enum ChatConnectionState { idle, connecting, connected, paired, closed, error }
 
 class ChatMessage {
@@ -33,6 +35,7 @@ class ChatClient extends ChangeNotifier {
 
   Uint8List? _key;
   bool _mismatchDetected = false;
+  ChatTerminationReason? _terminationReason;
   final List<_PendingCiphertext> _pendingDecrypt = [];
 
   WebSocketChannel? _channel;
@@ -47,6 +50,7 @@ class ChatClient extends ChangeNotifier {
   List<ChatMessage> get messages => List.unmodifiable(_messages);
   bool get hasKey => _key != null;
   bool get mismatchDetected => _mismatchDetected;
+  ChatTerminationReason? get terminationReason => _terminationReason;
 
   void _setState(ChatConnectionState s) {
     _state = s;
@@ -98,6 +102,7 @@ class ChatClient extends ChangeNotifier {
       case PeerJoinedMsg():
         _setState(ChatConnectionState.paired);
       case PeerLeftMsg():
+        _terminationReason = ChatTerminationReason.peerLeft;
         _setState(ChatConnectionState.closed);
         close();
       case MsgMsg():
@@ -194,17 +199,20 @@ class ChatClient extends ChangeNotifier {
 
   void _onError(Object error) {
     if (_state == ChatConnectionState.idle || _state == ChatConnectionState.closed) return;
+    _terminationReason = ChatTerminationReason.connectionLost;
     _lastError = 'connection_error';
     _setState(ChatConnectionState.error);
   }
 
   void _onDone() {
     if (_state == ChatConnectionState.idle || _state == ChatConnectionState.closed) return;
+    _terminationReason = ChatTerminationReason.connectionLost;
     _lastError = 'connection_lost';
     _setState(ChatConnectionState.closed);
   }
 
   Future<void> createRoom({bool passwordMode = false, String? nickname}) async {
+    _terminationReason = null;
     _lastError = null;
     _isHost = true;
     _localNickname = nickname?.trim().isNotEmpty == true ? nickname!.trim() : null;
@@ -219,6 +227,7 @@ class ChatClient extends ChangeNotifier {
       _setState(ChatConnectionState.error);
       return;
     }
+    _terminationReason = null;
     _lastError = null;
     _isHost = false;
     _localNickname = nickname?.trim().isNotEmpty == true ? nickname!.trim() : null;
@@ -273,9 +282,20 @@ class ChatClient extends ChangeNotifier {
     }
   }
 
-  /// @visibleForTesting — exposes the raw key bytes so tests can verify zeroing.
   @visibleForTesting
   Uint8List? get debugKeyBytes => _key;
+
+  @visibleForTesting
+  void debugInjectData(String frame) => _onData(frame);
+
+  @visibleForTesting
+  void debugInjectError(Object error) => _onError(error);
+
+  @visibleForTesting
+  void debugInjectDone() => _onDone();
+
+  @visibleForTesting
+  void debugSetState(ChatConnectionState s) => _setState(s);
 
   Future<void> close() async {
     final channel = _channel;

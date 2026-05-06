@@ -3,6 +3,9 @@ import 'theme/theme_controller.dart';
 import 'network/chat_client.dart';
 import 'screens/home_screen.dart';
 
+bool shouldCloseOnLifecycle(AppLifecycleState state) =>
+    state == AppLifecycleState.detached;
+
 final themeController = ThemeController();
 final chatClient = ChatClient();
 
@@ -37,8 +40,10 @@ class _SecretChatAppState extends State<SecretChatApp> with WidgetsBindingObserv
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // paused = backgrounded, room survives. detached = process going away, drop everything.
-    if (state == AppLifecycleState.detached) {
+    // Lifecycle policy:
+    //   paused / inactive / hidden  →  no-op (routine backgrounding preserves the session)
+    //   detached                    →  close (process going away — wipe everything)
+    if (shouldCloseOnLifecycle(state)) {
       widget.chatClient.close();
     }
   }

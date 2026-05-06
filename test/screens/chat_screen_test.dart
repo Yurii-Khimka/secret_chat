@@ -109,6 +109,68 @@ void main() {
       expect(find.text('unreadable'), findsOneWidget);
     });
   });
+
+  group('terminationReason UI', () {
+    testWidgets('peerLeft renders "peer disconnected — room closed"', (tester) async {
+      final client = _FakeChatClient(passwordMode: false);
+
+      await tester.pumpWidget(MaterialApp(
+        home: ChatScreen(theme: theme, chatClient: client),
+      ));
+      await tester.pump();
+
+      client.simulateTermination(ChatTerminationReason.peerLeft, ChatConnectionState.closed);
+      await tester.pump();
+
+      expect(find.text('peer disconnected \u2014 room closed'), findsOneWidget);
+    });
+
+    testWidgets('connectionLost renders "connection lost — room closed"', (tester) async {
+      final client = _FakeChatClient(passwordMode: false);
+
+      await tester.pumpWidget(MaterialApp(
+        home: ChatScreen(theme: theme, chatClient: client),
+      ));
+      await tester.pump();
+
+      client.simulateTermination(ChatTerminationReason.connectionLost, ChatConnectionState.closed);
+      await tester.pump();
+
+      expect(find.text('connection lost \u2014 room closed'), findsOneWidget);
+    });
+
+    testWidgets('composer disabled and TAP ANYWHERE TO EXIT on peerLeft', (tester) async {
+      final client = _FakeChatClient(passwordMode: false);
+
+      await tester.pumpWidget(MaterialApp(
+        home: ChatScreen(theme: theme, chatClient: client),
+      ));
+      await tester.pump();
+
+      client.simulateTermination(ChatTerminationReason.peerLeft, ChatConnectionState.closed);
+      await tester.pump();
+
+      final textField = tester.widget<TextField>(find.byType(TextField));
+      expect(textField.enabled, false);
+      expect(find.text('TAP ANYWHERE TO EXIT'), findsOneWidget);
+    });
+
+    testWidgets('composer disabled and TAP ANYWHERE TO EXIT on connectionLost', (tester) async {
+      final client = _FakeChatClient(passwordMode: false);
+
+      await tester.pumpWidget(MaterialApp(
+        home: ChatScreen(theme: theme, chatClient: client),
+      ));
+      await tester.pump();
+
+      client.simulateTermination(ChatTerminationReason.connectionLost, ChatConnectionState.error);
+      await tester.pump();
+
+      final textField = tester.widget<TextField>(find.byType(TextField));
+      expect(textField.enabled, false);
+      expect(find.text('TAP ANYWHERE TO EXIT'), findsOneWidget);
+    });
+  });
 }
 
 class _FakeChatClient extends ChangeNotifier implements ChatClient {
@@ -116,13 +178,19 @@ class _FakeChatClient extends ChangeNotifier implements ChatClient {
     bool mismatchDetected = false,
     bool passwordMode = true,
     List<ChatMessage>? messages,
+    ChatConnectionState? state,
+    ChatTerminationReason? terminationReason,
   })  : _mismatchDetected = mismatchDetected,
         _passwordMode = passwordMode,
-        _messages = messages ?? [];
+        _messages = messages ?? [],
+        _state = state ?? ChatConnectionState.paired,
+        _terminationReason = terminationReason;
 
   final bool _mismatchDetected;
   final bool _passwordMode;
   final List<ChatMessage> _messages;
+  ChatConnectionState _state;
+  ChatTerminationReason? _terminationReason;
   bool closeCalled = false;
 
   @override
@@ -138,13 +206,29 @@ class _FakeChatClient extends ChangeNotifier implements ChatClient {
   @override
   List<ChatMessage> get messages => List.unmodifiable(_messages);
   @override
-  ChatConnectionState get state => ChatConnectionState.paired;
+  ChatConnectionState get state => _state;
   @override
   String? get roomCode => 'TEST-1234';
   @override
   String? get lastError => null;
   @override
   Uint8List? get debugKeyBytes => null;
+  @override
+  ChatTerminationReason? get terminationReason => _terminationReason;
+  @override
+  void debugInjectData(String frame) {}
+  @override
+  void debugInjectError(Object error) {}
+  @override
+  void debugInjectDone() {}
+  @override
+  void debugSetState(ChatConnectionState s) {}
+
+  void simulateTermination(ChatTerminationReason reason, ChatConnectionState newState) {
+    _terminationReason = reason;
+    _state = newState;
+    notifyListeners();
+  }
 
   @override
   Future<void> createRoom({bool passwordMode = false, String? nickname}) async {}
