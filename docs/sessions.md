@@ -308,6 +308,24 @@ Done
 
 ---
 
+## Session 2026-05-06 — Task 10: Decrypt-failure UX + mismatch composer lock
+
+### Completed
+- ChatClient: `mismatchDetected` flag (one-way, first decrypt failure sets it)
+- MessageBubble: `decryptFailed` style — muted bg, italic "unreadable" label
+- ChatScreen: composer lock, mismatch warning, tap-to-exit, stale copy cleanup
+- Mode-aware labels: ENCRYPTED/PLAINTEXT in top-bar and footer
+- Widget tests for mismatch UI + updated room_setup assertions
+- flutter analyze: clean, flutter test: 69/69, npm test: 39/39
+
+### Branch
+task/decrypt-failure-ux
+
+### Status
+Done
+
+---
+
 ## Session 2026-05-06 — Task 9: E2E encryption (Argon2id + XChaCha20-Poly1305)
 
 ### Completed

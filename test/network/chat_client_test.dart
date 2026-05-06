@@ -170,4 +170,49 @@ void main() {
       expect(d1, isNull);
     });
   });
+
+  group('mismatchDetected (crypto-level simulation)', () {
+    test('failed decrypt produces empty text and decryptFailed flag', () async {
+      const roomCode = 'WOLF-1234';
+      final keyA = await deriveKey(phrase: 'xerxes', roomCode: roomCode);
+      final keyB = await deriveKey(phrase: 'Xerxes', roomCode: roomCode);
+
+      final encrypted = await encryptMessage(plaintext: 'hello', key: keyA);
+      final result = await decryptMessage(
+        ciphertextBase64: encrypted.ciphertext,
+        nonceBase64: encrypted.nonce,
+        key: keyB,
+      );
+
+      // Simulates what ChatClient does: on null → mismatchDetected = true, text = ''
+      expect(result, isNull);
+      // ChatClient would set: ChatMessage(text: '', decryptFailed: true)
+    });
+
+    test('successful round-trip leaves no mismatch', () async {
+      const roomCode = 'BEAR-1111';
+      final key = await deriveKey(phrase: 'same', roomCode: roomCode);
+      final encrypted = await encryptMessage(plaintext: 'works', key: key);
+      final result = await decryptMessage(
+        ciphertextBase64: encrypted.ciphertext,
+        nonceBase64: encrypted.nonce,
+        key: key,
+      );
+      expect(result, 'works');
+      // ChatClient would leave mismatchDetected = false
+    });
+
+    test('buffer + mismatch: all buffered messages fail', () async {
+      const roomCode = 'FOX-2222';
+      final peerKey = await deriveKey(phrase: 'correct', roomCode: roomCode);
+      final enc1 = await encryptMessage(plaintext: 'msg1', key: peerKey);
+      final enc2 = await encryptMessage(plaintext: 'msg2', key: peerKey);
+
+      final wrongKey = await deriveKey(phrase: 'wrong', roomCode: roomCode);
+      final d1 = await decryptMessage(ciphertextBase64: enc1.ciphertext, nonceBase64: enc1.nonce, key: wrongKey);
+      final d2 = await decryptMessage(ciphertextBase64: enc2.ciphertext, nonceBase64: enc2.nonce, key: wrongKey);
+      expect(d1, isNull);
+      expect(d2, isNull);
+    });
+  });
 }

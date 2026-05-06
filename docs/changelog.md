@@ -4,6 +4,19 @@ _Most recent changes appear at the top._
 
 ---
 
+## 2026-05-06 — Task 10: Decrypt-failure UX + mismatch composer lock
+
+- ChatClient: `mismatchDetected` one-way flag on first decrypt failure; cleared by `close()`
+- Failed decrypt messages: `text: ''`, `decryptFailed: true` (no ciphertext in UI)
+- MessageBubble: `decryptFailed` renders muted bg + italic "unreadable" label
+- ChatScreen: composer disabled on mismatch, warning SystemMessage, hint "phrase mismatch — leave the room"
+- Tap-anywhere-to-exit mirrors peer-left behaviour on mismatch
+- Stale copy cleanup: removed "encryption arrives in task 9"; open-mode banner updated
+- Mode-aware micro-text: ENCRYPTED / PLAINTEXT in top-bar and footer
+- Tests: flutter 69 (was 59), server 39 (unchanged)
+- Branch: task/decrypt-failure-ux
+- Commit: feat: decrypt-failure ux — mismatch warning + composer lock
+
 ## 2026-05-06 — Task 9: E2E encryption
 
 - Added `cryptography: ^2.7.0` dependency (resolved 2.9.0)

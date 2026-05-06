@@ -32,6 +32,7 @@ class ChatClient extends ChangeNotifier {
   final List<ChatMessage> _messages = [];
 
   Uint8List? _key;
+  bool _mismatchDetected = false;
   final List<_PendingCiphertext> _pendingDecrypt = [];
 
   WebSocketChannel? _channel;
@@ -45,6 +46,7 @@ class ChatClient extends ChangeNotifier {
   String? get localNickname => _localNickname;
   List<ChatMessage> get messages => List.unmodifiable(_messages);
   bool get hasKey => _key != null;
+  bool get mismatchDetected => _mismatchDetected;
 
   void _setState(ChatConnectionState s) {
     _state = s;
@@ -109,13 +111,11 @@ class ChatClient extends ChangeNotifier {
         ));
         notifyListeners();
       }
-      // ciphertext in open mode = protocol violation, drop silently
       return;
     }
 
     // Password mode
     if (msg.text != null) {
-      // plaintext in password mode = protocol violation, drop
       return;
     }
 
@@ -145,8 +145,9 @@ class ChatClient extends ChangeNotifier {
         at: DateTime.now(),
       ));
     } else {
+      _mismatchDetected = true;
       _messages.add(ChatMessage(
-        text: '<<$ciphertext>>',
+        text: '',
         fromSelf: false,
         at: DateTime.now(),
         decryptFailed: true,
@@ -171,14 +172,16 @@ class ChatClient extends ChangeNotifier {
           at: p.at,
         ));
       } else {
+        _mismatchDetected = true;
         _messages.add(ChatMessage(
-          text: '<<${p.ciphertext}>>',
+          text: '',
           fromSelf: false,
           at: p.at,
           decryptFailed: true,
         ));
       }
     }
+    notifyListeners();
   }
 
   void _onError(Object error) {
@@ -274,6 +277,7 @@ class ChatClient extends ChangeNotifier {
     _localNickname = null;
     _messages.clear();
     _key = null;
+    _mismatchDetected = false;
     _pendingDecrypt.clear();
     _state = ChatConnectionState.idle;
     try {
