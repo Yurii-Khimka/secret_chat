@@ -26,8 +26,8 @@
 - [ ] Argon2 password → key derivation on device
 - [ ] AES-256 message encryption on device
 - [ ] Verify zero server-side logging (no IPs, no payloads, no metadata beyond room code)
-- [ ] Session cleanup on app close (memory wipe)
-- [ ] Key verification handshake between peers
+- [x] Session cleanup on app close (memory wipe)
+- [~] Key verification handshake between peers — superseded by Task 10 implicit-mismatch model (decrypt failure → warning + lock)
 
 ### Phase 3 — Polish
 - [ ] Connection error handling + retry UX
@@ -302,6 +302,23 @@ Partially done — UX fixes complete, manual verification blocked
 
 ### Branch
 task/flutter-network-client
+
+### Status
+Done
+
+---
+
+## Session 2026-05-06 — Task 11: Security cleanup — memory wipe + lifecycle hardening
+
+### Completed
+- `zeroBytes()` helper in crypto.dart
+- `close()`: key bytes zeroed, pending buffer cleared first, socket teardown bounded 1s
+- `@visibleForTesting debugKeyBytes` getter for zeroing verification
+- Lifecycle policy verified: detached-only, paused preserves session
+- Tests: flutter 75/75 (was 69), server 39/39 (unchanged)
+
+### Branch
+task/security-cleanup
 
 ### Status
 Done

@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -180,6 +181,8 @@ class _FakeChatClient extends ChangeNotifier implements ChatClient {
   bool get hasKey => false;
   @override
   bool get mismatchDetected => false;
+  @override
+  Uint8List? get debugKeyBytes => null;
 
   @override
   Future<void> createRoom({bool passwordMode = false, String? nickname}) async {}

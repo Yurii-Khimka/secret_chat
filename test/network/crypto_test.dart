@@ -79,4 +79,23 @@ void main() {
       expect(r1.nonce, isNot(equals(r2.nonce)));
     });
   });
+
+  group('zeroBytes', () {
+    test('null is a no-op', () {
+      expect(() => zeroBytes(null), returnsNormally);
+    });
+
+    test('sets every byte to 0', () {
+      final bytes = Uint8List.fromList([1, 2, 3, 4, 5]);
+      zeroBytes(bytes);
+      expect(bytes, equals(Uint8List(5)));
+    });
+
+    test('zeros deriveKey output', () async {
+      final key = await deriveKey(phrase: 'test', roomCode: 'FOX-0001');
+      expect(key.any((b) => b != 0), true);
+      zeroBytes(key);
+      expect(key.every((b) => b == 0), true);
+    });
+  });
 }
