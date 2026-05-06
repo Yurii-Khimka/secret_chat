@@ -390,10 +390,10 @@ describe('secret-chat-server', { concurrency: false }, () => {
 
   // Relay tests
   describe('Relay', () => {
-    async function createPair() {
+    async function createPair(passwordMode = false) {
       const a = await connect();
       await nextMessage(a); // hello
-      a.send(JSON.stringify({ type: 'create_room' }));
+      a.send(JSON.stringify({ type: 'create_room', password_mode: passwordMode }));
       const created = await nextMessage(a);
       const code = created.code;
 
@@ -405,21 +405,88 @@ describe('secret-chat-server', { concurrency: false }, () => {
       return { a, b, code };
     }
 
-    test('A → B relay', async () => {
+    test('open room: text relay A → B', async () => {
       const { a, b } = await createPair();
-      a.send(JSON.stringify({ type: 'msg', payload: 'hello-from-a' }));
+      a.send(JSON.stringify({ type: 'msg', text: 'hello-from-a' }));
       const msg = await nextMessage(b);
-      assert.deepEqual(msg, { type: 'msg', payload: 'hello-from-a' });
+      assert.deepEqual(msg, { type: 'msg', text: 'hello-from-a' });
       await closeWs(b);
       await new Promise((r) => setTimeout(r, 50));
       await closeWs(a);
     });
 
-    test('B → A relay', async () => {
+    test('open room: text relay B → A', async () => {
       const { a, b } = await createPair();
-      b.send(JSON.stringify({ type: 'msg', payload: 'hello-from-b' }));
+      b.send(JSON.stringify({ type: 'msg', text: 'hello-from-b' }));
       const msg = await nextMessage(a);
-      assert.deepEqual(msg, { type: 'msg', payload: 'hello-from-b' });
+      assert.deepEqual(msg, { type: 'msg', text: 'hello-from-b' });
+      await closeWs(b);
+      await new Promise((r) => setTimeout(r, 50));
+      await closeWs(a);
+    });
+
+    test('open room: ciphertext rejected', async () => {
+      const { a, b } = await createPair();
+      a.send(JSON.stringify({ type: 'msg', ciphertext: 'abc', nonce: 'def' }));
+      const msg = await nextMessage(a);
+      assert.equal(msg.type, 'error');
+      assert.equal(msg.code, 'bad_request');
+      assert.match(msg.reason, /ciphertext not allowed/);
+      await closeWs(b);
+      await new Promise((r) => setTimeout(r, 50));
+      await closeWs(a);
+    });
+
+    test('password room: ciphertext+nonce relay', async () => {
+      const { a, b } = await createPair(true);
+      a.send(JSON.stringify({ type: 'msg', ciphertext: 'AAAA', nonce: 'BBBB' }));
+      const msg = await nextMessage(b);
+      assert.deepEqual(msg, { type: 'msg', ciphertext: 'AAAA', nonce: 'BBBB' });
+      await closeWs(b);
+      await new Promise((r) => setTimeout(r, 50));
+      await closeWs(a);
+    });
+
+    test('password room: plaintext rejected', async () => {
+      const { a, b } = await createPair(true);
+      a.send(JSON.stringify({ type: 'msg', text: 'hello' }));
+      const msg = await nextMessage(a);
+      assert.equal(msg.type, 'error');
+      assert.equal(msg.code, 'bad_request');
+      assert.match(msg.reason, /plaintext not allowed/);
+      await closeWs(b);
+      await new Promise((r) => setTimeout(r, 50));
+      await closeWs(a);
+    });
+
+    test('msg with neither text nor ciphertext → bad_request', async () => {
+      const { a, b } = await createPair();
+      a.send(JSON.stringify({ type: 'msg' }));
+      const msg = await nextMessage(a);
+      assert.equal(msg.type, 'error');
+      assert.equal(msg.code, 'bad_request');
+      await closeWs(b);
+      await new Promise((r) => setTimeout(r, 50));
+      await closeWs(a);
+    });
+
+    test('msg with both text and ciphertext → bad_request', async () => {
+      const { a, b } = await createPair();
+      a.send(JSON.stringify({ type: 'msg', text: 'hi', ciphertext: 'abc', nonce: 'def' }));
+      const msg = await nextMessage(a);
+      assert.equal(msg.type, 'error');
+      assert.equal(msg.code, 'bad_request');
+      await closeWs(b);
+      await new Promise((r) => setTimeout(r, 50));
+      await closeWs(a);
+    });
+
+    test('text length > 4096 → bad_request', async () => {
+      const { a, b } = await createPair();
+      a.send(JSON.stringify({ type: 'msg', text: 'x'.repeat(4097) }));
+      const msg = await nextMessage(a);
+      assert.equal(msg.type, 'error');
+      assert.equal(msg.code, 'bad_request');
       await closeWs(b);
       await new Promise((r) => setTimeout(r, 50));
       await closeWs(a);
@@ -428,7 +495,7 @@ describe('secret-chat-server', { concurrency: false }, () => {
     test('sender not in a room → not_in_room', async () => {
       const ws = await connect();
       await nextMessage(ws); // hello
-      ws.send(JSON.stringify({ type: 'msg', payload: 'test' }));
+      ws.send(JSON.stringify({ type: 'msg', text: 'test' }));
       const msg = await nextMessage(ws);
       assert.equal(msg.type, 'error');
       assert.equal(msg.code, 'not_in_room');
@@ -440,16 +507,17 @@ describe('secret-chat-server', { concurrency: false }, () => {
       await nextMessage(a); // hello
       a.send(JSON.stringify({ type: 'create_room' }));
       await nextMessage(a); // room_created
-      a.send(JSON.stringify({ type: 'msg', payload: 'test' }));
+      a.send(JSON.stringify({ type: 'msg', text: 'test' }));
       const msg = await nextMessage(a);
       assert.equal(msg.type, 'error');
       assert.equal(msg.code, 'not_paired');
       await closeWs(a);
     });
 
-    test('missing payload → bad_message', async () => {
+    test('oversized frame → bad_message', async () => {
       const { a, b } = await createPair();
-      a.send(JSON.stringify({ type: 'msg' }));
+      const bigText = 'x'.repeat(16 * 1024 + 1);
+      a.send(JSON.stringify({ type: 'msg', text: bigText }));
       const msg = await nextMessage(a);
       assert.equal(msg.type, 'error');
       assert.equal(msg.code, 'bad_message');
@@ -458,41 +526,13 @@ describe('secret-chat-server', { concurrency: false }, () => {
       await closeWs(a);
     });
 
-    test('non-string payload → bad_message', async () => {
-      const { a, b } = await createPair();
-      a.send(JSON.stringify({ type: 'msg', payload: 123 }));
-      const msg = await nextMessage(a);
-      assert.equal(msg.type, 'error');
-      assert.equal(msg.code, 'bad_message');
-      await closeWs(b);
-      await new Promise((r) => setTimeout(r, 50));
-      await closeWs(a);
-    });
-
-    test('oversized frame → bad_message, peer receives nothing', async () => {
-      const { a, b } = await createPair();
-      // Build a frame larger than 16 KB
-      const bigPayload = 'x'.repeat(16 * 1024 + 1);
-      a.send(JSON.stringify({ type: 'msg', payload: bigPayload }));
-      const msg = await nextMessage(a);
-      assert.equal(msg.type, 'error');
-      assert.equal(msg.code, 'bad_message');
-      // B should not have received anything — send a known msg to verify
-      b.send(JSON.stringify({ type: 'msg', payload: 'check' }));
-      const check = await nextMessage(a);
-      assert.deepEqual(check, { type: 'msg', payload: 'check' });
-      await closeWs(b);
-      await new Promise((r) => setTimeout(r, 50));
-      await closeWs(a);
-    });
-
-    test('server does not modify payload (special chars)', async () => {
+    test('server does not modify text (special chars)', async () => {
       const { a, b } = await createPair();
       const special = 'a"b\\cé';
-      a.send(JSON.stringify({ type: 'msg', payload: special }));
+      a.send(JSON.stringify({ type: 'msg', text: special }));
       const msg = await nextMessage(b);
       assert.equal(msg.type, 'msg');
-      assert.equal(msg.payload, special);
+      assert.equal(msg.text, special);
       await closeWs(b);
       await new Promise((r) => setTimeout(r, 50));
       await closeWs(a);

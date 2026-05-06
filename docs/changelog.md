@@ -4,6 +4,20 @@ _Most recent changes appear at the top._
 
 ---
 
+## 2026-05-06 — Task 9: E2E encryption
+
+- Added `cryptography: ^2.7.0` dependency (resolved 2.9.0)
+- Created `lib/network/crypto.dart`: Argon2id KDF (m=19456, t=2, p=1, len=32) + XChaCha20-Poly1305 AEAD
+- Salt = SHA-256(roomCode)[0..16) — deterministic, no handshake needed
+- ChatClient: password-mode first message derives key, encrypts phrase, drains buffered peer messages
+- ChatMessage (renamed from IncomingMessage): added `decryptFailed` flag
+- Protocol: `msg` frame now carries `text` (open) or `ciphertext`+`nonce` (password) — not `payload`
+- Server: validates msg shape, cross-checks room passwordMode, 4096-char field cap
+- ChatScreen: "type the phrase…" hint when key not yet set
+- Tests: flutter 59 (was 36), server 39 (was 35)
+- Branch: task/e2e-encryption
+- Commit: feat: e2e encryption — argon2id key derivation + xchacha20-poly1305 messages
+
 ## 2026-05-06 — Task 8c: Phrase-mode message wrap fix
 
 - Removed hard `\n` line breaks from phrase-mode SystemMessage string in chat_screen.dart

@@ -48,12 +48,24 @@ void main() {
       expect(msg, isA<PeerLeftMsg>());
     });
 
-    test('parses msg with special chars', () {
-      final payload = 'a"b\\cé';
-      final raw = jsonEncode({'type': 'msg', 'payload': payload});
+    test('parses msg with text field', () {
+      final raw = jsonEncode({'type': 'msg', 'text': 'hello'});
       final msg = parseFrame(raw);
       expect(msg, isA<MsgMsg>());
-      expect((msg as MsgMsg).payload, payload);
+      final m = msg as MsgMsg;
+      expect(m.text, 'hello');
+      expect(m.ciphertext, isNull);
+      expect(m.nonce, isNull);
+    });
+
+    test('parses msg with ciphertext+nonce', () {
+      final raw = jsonEncode({'type': 'msg', 'ciphertext': 'AAAA', 'nonce': 'BBBB'});
+      final msg = parseFrame(raw);
+      expect(msg, isA<MsgMsg>());
+      final m = msg as MsgMsg;
+      expect(m.text, isNull);
+      expect(m.ciphertext, 'AAAA');
+      expect(m.nonce, 'BBBB');
     });
 
     test('parses error', () {
@@ -75,7 +87,7 @@ void main() {
     test('returns null for missing fields', () {
       // room_created without code
       expect(parseFrame('{"type":"room_created"}'), isNull);
-      // msg without payload
+      // msg without text or ciphertext
       expect(parseFrame('{"type":"msg"}'), isNull);
     });
   });
@@ -99,10 +111,17 @@ void main() {
       expect(parsed['code'], 'HAWK-9999');
     });
 
-    test('msgFrame', () {
-      final parsed = jsonDecode(msgFrame('hello world'));
+    test('msgTextFrame', () {
+      final parsed = jsonDecode(msgTextFrame('hello world'));
       expect(parsed['type'], 'msg');
-      expect(parsed['payload'], 'hello world');
+      expect(parsed['text'], 'hello world');
+    });
+
+    test('msgCipherFrame', () {
+      final parsed = jsonDecode(msgCipherFrame(ciphertext: 'AAA', nonce: 'BBB'));
+      expect(parsed['type'], 'msg');
+      expect(parsed['ciphertext'], 'AAA');
+      expect(parsed['nonce'], 'BBB');
     });
   });
 

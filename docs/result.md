@@ -1,32 +1,33 @@
 # Last Task Result
 
 ## Task
-Phase 2 / Task 8c — Phrase-mode message: drop hard line breaks.
+Phase 2 / Task 9 — End-to-end encryption: Argon2id KDF + XChaCha20-Poly1305 messages.
 
 ## Branch
-task/phrase-message-wrap
+task/e2e-encryption
 
 ## Commit
-fix: phrase-mode message wraps naturally — drop hard line breaks
+feat: e2e encryption — argon2id key derivation + xchacha20-poly1305 messages
 
 ## What Was Done
 
-Replaced the phrase-mode `SystemMessage` string in `chat_screen.dart`. The old string had hard `\n` breaks at ~40-char boundaries causing a "ladder" effect when Flutter re-wrapped. The new string keeps exactly one `\n` (between `// phrase mode` header and body) so the multi-line branch in `SystemMessage` still triggers, but the body is a single continuous paragraph that Flutter wraps naturally to container width.
+Implemented full E2E encryption for password-mode rooms:
 
-New exact string:
-```
-// phrase mode
-this room requires a shared phrase. type the phrase you agreed on with the other participant as your first message. it acts as the encryption key — messages will be unreadable without an exact case-sensitive match. (encryption arrives in task 9)
-```
-
-Also removed an unused `tokens.dart` import from `test/chat_ux_polish_test.dart` (lint fix).
+- **crypto.dart** (new): `deriveKey()` using Argon2id (m=19456, p=1, t=2, len=32) with SHA-256(roomCode)[0..16) as salt; `encryptMessage()` / `decryptMessage()` using XChaCha20-Poly1305 with 24-byte random nonce per message.
+- **ChatClient**: Added `_key`, `hasKey`, `_pendingDecrypt` state. Send path: first message in password mode derives key from phrase, drains pending buffer, encrypts. Receive path: buffers ciphertext until key set, then decrypts. Open mode unchanged.
+- **ChatMessage**: Renamed from `IncomingMessage`, added `decryptFailed` flag.
+- **protocol.dart**: `MsgMsg` now has `text?`, `ciphertext?`, `nonce?` fields. New `msgTextFrame()` / `msgCipherFrame()` builders replace old `msgFrame()`.
+- **ChatScreen**: Hint text shows "type the phrase…" when passwordMode && !hasKey.
+- **Server ws.js**: Validates `msg` shape (exactly one of text or ciphertext+nonce), cross-checks against room's passwordMode, enforces 4096-char cap per field. Relays verbatim.
+- **Tests**: crypto unit tests (7), chat_client E2E tests (12), updated protocol tests, updated server relay tests.
 
 ## Status
 Done
 
 ## Notes
 - `flutter analyze`: no issues
-- `flutter test`: 36/36 (unchanged from Task 8b)
-- `npm test`: 35/35 (unchanged)
-- `git diff --name-only main..HEAD`: `lib/screens/chat_screen.dart`, `test/chat_ux_polish_test.dart`
-- What's next: live verification by Owner, then Task 9 (Argon2id + XChaCha20-Poly1305)
+- `flutter test`: 59 tests (up from 36 in Task 8c)
+- `npm test`: 39 tests (up from 35)
+- Argon2id timing on Mac (pure Dart): ~166ms — well within 2s budget. No need for fallback parameters.
+- `cryptography: 2.9.0` installed (latest stable, compatible with ^2.7.0 constraint)
+- OWASP "second recommended" Argon2id profile used as specified (m=19456 KiB, t=2, p=1)

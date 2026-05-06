@@ -94,8 +94,8 @@ void main() {
         isHost: true,
         localNickname: null,
         messages: [
-          IncomingMessage(text: 'hello', fromSelf: true, at: DateTime.now()),
-          IncomingMessage(text: 'hi', fromSelf: false, at: DateTime.now()),
+          ChatMessage(text: 'hello', fromSelf: true, at: DateTime.now()),
+          ChatMessage(text: 'hi', fromSelf: false, at: DateTime.now()),
         ],
       );
 
@@ -114,8 +114,8 @@ void main() {
         isHost: false,
         localNickname: 'alice',
         messages: [
-          IncomingMessage(text: 'hello', fromSelf: true, at: DateTime.now()),
-          IncomingMessage(text: 'hi', fromSelf: false, at: DateTime.now()),
+          ChatMessage(text: 'hello', fromSelf: true, at: DateTime.now()),
+          ChatMessage(text: 'hi', fromSelf: false, at: DateTime.now()),
         ],
       );
 
@@ -134,7 +134,7 @@ void main() {
         isHost: true,
         localNickname: null,
         messages: [
-          IncomingMessage(text: 'test', fromSelf: true, at: DateTime.now()),
+          ChatMessage(text: 'test', fromSelf: true, at: DateTime.now()),
         ],
       );
 
@@ -153,21 +153,21 @@ class _FakeChatClient extends ChangeNotifier implements ChatClient {
   _FakeChatClient({
     required bool? isHost,
     required String? localNickname,
-    required List<IncomingMessage> messages,
+    required List<ChatMessage> messages,
   })  : _isHost = isHost,
         _localNickname = localNickname,
         _messages = messages;
 
   final bool? _isHost;
   final String? _localNickname;
-  final List<IncomingMessage> _messages;
+  final List<ChatMessage> _messages;
 
   @override
   bool? get isHost => _isHost;
   @override
   String? get localNickname => _localNickname;
   @override
-  List<IncomingMessage> get messages => List.unmodifiable(_messages);
+  List<ChatMessage> get messages => List.unmodifiable(_messages);
   @override
   ChatConnectionState get state => ChatConnectionState.paired;
   @override
@@ -176,6 +176,8 @@ class _FakeChatClient extends ChangeNotifier implements ChatClient {
   String? get lastError => null;
   @override
   bool get passwordMode => false;
+  @override
+  bool get hasKey => false;
 
   @override
   Future<void> createRoom({bool passwordMode = false, String? nickname}) async {}

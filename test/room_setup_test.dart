@@ -108,5 +108,8 @@ class _FakeChatClient extends ChatClient {
   String? get roomCode => 'TEST-0000';
 
   @override
-  List<IncomingMessage> get messages => [];
+  List<ChatMessage> get messages => [];
+
+  @override
+  bool get hasKey => false;
 }
