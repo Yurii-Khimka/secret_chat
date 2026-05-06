@@ -4,6 +4,21 @@ _Most recent changes appear at the top._
 
 ---
 
+## 2026-05-06 — Task 17: Activation gate v1
+
+- Owner-side CLI tools: `tools/keygen.dart` (ed25519 keypair), `tools/mint_code.dart` (sign activation codes)
+- Embedded public key placeholder in `lib/security/activation_pubkey.dart` (all zeros = locked)
+- `verifyActivationCode()`: ed25519 verification, whitespace stripping, placeholder rejection, `@visibleForTesting` override
+- `ActivationController`: load/persist/re-verify activation code via SharedPreferences
+- `ActivationScreen`: terminal-aesthetic paste screen — PulseDot, "Invite required" + Caret, multi-line TextField, ACTIVATE button, error display
+- `main.dart`: `Listenable.merge([themeController, activationController])` gates HomeScreen behind activation
+- `.gitignore`: `tools/keys/` and `*.private.key` entries
+- `docs/readme.md`: "Activation (v1)" section with collaborator instructions
+- Tests: flutter 123 (was 102), server 43 (unchanged)
+- No new dependencies, no server changes
+- Branch: task/activation-gate-v1
+- Commit: feat: activation gate v1 — ed25519-signed access codes
+
 ## 2026-05-06 — Task 16: UI polish pass 1
 
 - New `Caret` component: blinking block cursor (530ms cycle, accent-colored)

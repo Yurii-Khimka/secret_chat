@@ -46,3 +46,7 @@ app.*.map.json
 
 # Server
 server/node_modules/
+
+# Activation signing keys — never commit.
+tools/keys/
+*.private.key
