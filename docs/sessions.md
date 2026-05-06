@@ -308,6 +308,26 @@ Done
 
 ---
 
+## Session 2026-05-06 — Task 9: E2E encryption (Argon2id + XChaCha20-Poly1305)
+
+### Completed
+- Created `lib/network/crypto.dart` with Argon2id KDF + XChaCha20-Poly1305 encrypt/decrypt
+- Rewrote ChatClient send/receive paths for password-mode encryption
+- Added `hasKey`, `_pendingDecrypt` buffer, `decryptFailed` flag on ChatMessage
+- Updated protocol: MsgMsg now carries text OR ciphertext+nonce (not payload)
+- ChatScreen shows "type the phrase…" hint when awaiting key
+- Server validates msg shape, cross-checks passwordMode, enforces 4096-char cap
+- flutter analyze: clean, flutter test: 59/59, npm test: 39/39
+- Argon2id timing: ~166ms on Mac (pure Dart)
+
+### Branch
+task/e2e-encryption
+
+### Status
+Done
+
+---
+
 ## Session 2026-05-06 — Task 8c: Phrase-mode message wrap fix
 
 ### Completed

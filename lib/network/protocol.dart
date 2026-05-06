@@ -39,8 +39,10 @@ class PeerJoinedMsg extends ServerMessage {}
 class PeerLeftMsg extends ServerMessage {}
 
 class MsgMsg extends ServerMessage {
-  MsgMsg(this.payload);
-  final String payload;
+  MsgMsg({this.text, this.ciphertext, this.nonce});
+  final String? text;
+  final String? ciphertext;
+  final String? nonce;
 }
 
 class ErrorMsg extends ServerMessage {
@@ -70,13 +72,27 @@ ServerMessage? parseFrame(String raw) {
         : null,
     kPeerJoined => PeerJoinedMsg(),
     kPeerLeft => PeerLeftMsg(),
-    kMsg => parsed['payload'] is String ? MsgMsg(parsed['payload'] as String) : null,
+    kMsg => _parseMsgMsg(parsed),
     kError => ErrorMsg(
         parsed['code'] as String? ?? 'unknown',
         parsed['reason'] as String? ?? '',
       ),
     _ => null,
   };
+}
+
+MsgMsg? _parseMsgMsg(Map<String, dynamic> parsed) {
+  final text = parsed['text'];
+  final ciphertext = parsed['ciphertext'];
+  final nonce = parsed['nonce'];
+
+  if (text is String && text.isNotEmpty && ciphertext == null && nonce == null) {
+    return MsgMsg(text: text);
+  }
+  if (ciphertext is String && ciphertext.isNotEmpty && nonce is String && nonce.isNotEmpty && text == null) {
+    return MsgMsg(ciphertext: ciphertext, nonce: nonce);
+  }
+  return null;
 }
 
 // ── Outbound (client → server) ─────────────────────────────────
@@ -86,4 +102,7 @@ String createRoomFrame({bool passwordMode = false}) =>
 
 String joinRoomFrame(String code) => jsonEncode({'type': kJoinRoom, 'code': code});
 
-String msgFrame(String payload) => jsonEncode({'type': kMsg, 'payload': payload});
+String msgTextFrame(String text) => jsonEncode({'type': kMsg, 'text': text});
+
+String msgCipherFrame({required String ciphertext, required String nonce}) =>
+    jsonEncode({'type': kMsg, 'ciphertext': ciphertext, 'nonce': nonce});

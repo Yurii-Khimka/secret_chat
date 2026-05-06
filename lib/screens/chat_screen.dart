@@ -65,7 +65,7 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
-  String _labelFor(IncomingMessage msg) {
+  String _labelFor(ChatMessage msg) {
     final client = widget.chatClient;
     if (msg.fromSelf) {
       final nick = client.localNickname;
@@ -249,7 +249,11 @@ class _ChatScreenState extends State<ChatScreen> {
                                 isDense: true,
                                 contentPadding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
                                 border: InputBorder.none,
-                                hintText: _peerLeft ? 'room closed' : 'message',
+                                hintText: _peerLeft
+                                    ? 'room closed'
+                                    : (widget.chatClient.passwordMode && !widget.chatClient.hasKey)
+                                        ? 'type the phrase\u2026'
+                                        : 'message',
                                 hintStyle: AppTypography.body.copyWith(color: p.textMuted),
                               ),
                             ),

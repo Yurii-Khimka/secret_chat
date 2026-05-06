@@ -3,13 +3,22 @@ import 'package:flutter/foundation.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'server_config.dart';
 import 'protocol.dart';
+import 'crypto.dart';
 
 enum ChatConnectionState { idle, connecting, connected, paired, closed, error }
 
-class IncomingMessage {
-  IncomingMessage({required this.text, required this.fromSelf, required this.at});
+class ChatMessage {
+  ChatMessage({required this.text, required this.fromSelf, required this.at, this.decryptFailed = false});
   final String text;
   final bool fromSelf;
+  final DateTime at;
+  final bool decryptFailed;
+}
+
+class _PendingCiphertext {
+  _PendingCiphertext({required this.ciphertext, required this.nonce, required this.at});
+  final String ciphertext;
+  final String nonce;
   final DateTime at;
 }
 
@@ -20,7 +29,10 @@ class ChatClient extends ChangeNotifier {
   bool _passwordMode = false;
   bool? _isHost;
   String? _localNickname;
-  final List<IncomingMessage> _messages = [];
+  final List<ChatMessage> _messages = [];
+
+  Uint8List? _key;
+  final List<_PendingCiphertext> _pendingDecrypt = [];
 
   WebSocketChannel? _channel;
   StreamSubscription? _subscription;
@@ -31,7 +43,8 @@ class ChatClient extends ChangeNotifier {
   bool get passwordMode => _passwordMode;
   bool? get isHost => _isHost;
   String? get localNickname => _localNickname;
-  List<IncomingMessage> get messages => List.unmodifiable(_messages);
+  List<ChatMessage> get messages => List.unmodifiable(_messages);
+  bool get hasKey => _key != null;
 
   void _setState(ChatConnectionState s) {
     _state = s;
@@ -45,7 +58,6 @@ class ChatClient extends ChangeNotifier {
       final channel = WebSocketChannel.connect(ServerConfig.serverUri);
       await channel.ready;
       _channel = channel;
-      // no client data on this path
       _subscription = channel.stream.listen(
         _onData,
         onError: _onError,
@@ -79,15 +91,93 @@ class ChatClient extends ChangeNotifier {
         _setState(ChatConnectionState.closed);
         close();
       case MsgMsg():
-        _messages.add(IncomingMessage(
-          text: msg.payload,
+        _handleIncomingMsg(msg);
+      case ErrorMsg():
+        _lastError = msg.code;
+        _setState(ChatConnectionState.error);
+    }
+  }
+
+  void _handleIncomingMsg(MsgMsg msg) {
+    if (!_passwordMode) {
+      // Open mode
+      if (msg.text != null) {
+        _messages.add(ChatMessage(
+          text: msg.text!,
           fromSelf: false,
           at: DateTime.now(),
         ));
         notifyListeners();
-      case ErrorMsg():
-        _lastError = msg.code;
-        _setState(ChatConnectionState.error);
+      }
+      // ciphertext in open mode = protocol violation, drop silently
+      return;
+    }
+
+    // Password mode
+    if (msg.text != null) {
+      // plaintext in password mode = protocol violation, drop
+      return;
+    }
+
+    if (msg.ciphertext != null && msg.nonce != null) {
+      if (_key == null) {
+        _pendingDecrypt.add(_PendingCiphertext(
+          ciphertext: msg.ciphertext!,
+          nonce: msg.nonce!,
+          at: DateTime.now(),
+        ));
+      } else {
+        _decryptAndEmit(msg.ciphertext!, msg.nonce!);
+      }
+    }
+  }
+
+  Future<void> _decryptAndEmit(String ciphertext, String nonce) async {
+    final plaintext = await decryptMessage(
+      ciphertextBase64: ciphertext,
+      nonceBase64: nonce,
+      key: _key!,
+    );
+    if (plaintext != null) {
+      _messages.add(ChatMessage(
+        text: plaintext,
+        fromSelf: false,
+        at: DateTime.now(),
+      ));
+    } else {
+      _messages.add(ChatMessage(
+        text: '<<$ciphertext>>',
+        fromSelf: false,
+        at: DateTime.now(),
+        decryptFailed: true,
+      ));
+    }
+    notifyListeners();
+  }
+
+  Future<void> _drainPending() async {
+    final pending = List<_PendingCiphertext>.from(_pendingDecrypt);
+    _pendingDecrypt.clear();
+    for (final p in pending) {
+      final plaintext = await decryptMessage(
+        ciphertextBase64: p.ciphertext,
+        nonceBase64: p.nonce,
+        key: _key!,
+      );
+      if (plaintext != null) {
+        _messages.add(ChatMessage(
+          text: plaintext,
+          fromSelf: false,
+          at: p.at,
+        ));
+      } else {
+        _messages.add(ChatMessage(
+          text: '<<${p.ciphertext}>>',
+          fromSelf: false,
+          at: p.at,
+          decryptFailed: true,
+        ));
+      }
     }
   }
 
@@ -129,13 +219,47 @@ class ChatClient extends ChangeNotifier {
   Future<void> sendMessage(String text) async {
     if (_state != ChatConnectionState.paired) return;
     if (text.isEmpty) return;
-    _messages.add(IncomingMessage(
-      text: text,
-      fromSelf: true,
-      at: DateTime.now(),
-    ));
-    notifyListeners();
-    _channel?.sink.add(msgFrame(text));
+
+    if (!_passwordMode) {
+      // Open mode: send plaintext
+      _messages.add(ChatMessage(
+        text: text,
+        fromSelf: true,
+        at: DateTime.now(),
+      ));
+      notifyListeners();
+      _channel?.sink.add(msgTextFrame(text));
+      return;
+    }
+
+    // Password mode
+    if (_key == null) {
+      // First message is the phrase — derive key
+      _key = await deriveKey(phrase: text, roomCode: _roomCode!);
+
+      // Drain pending (insert before local message)
+      await _drainPending();
+
+      // Encrypt the phrase itself and send
+      final encrypted = await encryptMessage(plaintext: text, key: _key!);
+      _messages.add(ChatMessage(
+        text: text,
+        fromSelf: true,
+        at: DateTime.now(),
+      ));
+      notifyListeners();
+      _channel?.sink.add(msgCipherFrame(ciphertext: encrypted.ciphertext, nonce: encrypted.nonce));
+    } else {
+      // Subsequent messages
+      final encrypted = await encryptMessage(plaintext: text, key: _key!);
+      _messages.add(ChatMessage(
+        text: text,
+        fromSelf: true,
+        at: DateTime.now(),
+      ));
+      notifyListeners();
+      _channel?.sink.add(msgCipherFrame(ciphertext: encrypted.ciphertext, nonce: encrypted.nonce));
+    }
   }
 
   Future<void> close() async {
@@ -149,6 +273,8 @@ class ChatClient extends ChangeNotifier {
     _isHost = null;
     _localNickname = null;
     _messages.clear();
+    _key = null;
+    _pendingDecrypt.clear();
     _state = ChatConnectionState.idle;
     try {
       await channel?.sink.close();

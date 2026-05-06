@@ -93,20 +93,57 @@ export function attachWebSocket(httpServer) {
         }
         // RELAY: silent path. Do not add logging here.
         case MSG_MSG: {
-          if (typeof msg.payload !== 'string' || msg.payload.length === 0) {
-            ws.send(errorMessage('bad_message', 'payload required'));
+          // Validate shape: exactly one of text OR (ciphertext + nonce)
+          const hasText = typeof msg.text === 'string' && msg.text.length > 0;
+          const hasCipher = typeof msg.ciphertext === 'string' && msg.ciphertext.length > 0
+            && typeof msg.nonce === 'string' && msg.nonce.length > 0;
+
+          if (hasText === hasCipher) {
+            // Both present or neither present
+            ws.send(errorMessage('bad_request', 'invalid msg shape'));
             break;
           }
+
+          // Length cap: 4096 chars each
+          if (hasText && msg.text.length > 4096) {
+            ws.send(errorMessage('bad_request', 'invalid msg shape'));
+            break;
+          }
+          if (hasCipher && (msg.ciphertext.length > 4096 || msg.nonce.length > 4096)) {
+            ws.send(errorMessage('bad_request', 'invalid msg shape'));
+            break;
+          }
+
           if (!ws.roomCode) {
             ws.send(errorMessage('not_in_room', 'create or join a room first'));
             break;
           }
+
+          // Cross-check against room's passwordMode
+          const room = getRoom(ws.roomCode);
+          if (room && room.passwordMode && hasText) {
+            ws.send(errorMessage('bad_request', 'plaintext not allowed in password room'));
+            break;
+          }
+          if (room && !room.passwordMode && hasCipher) {
+            ws.send(errorMessage('bad_request', 'ciphertext not allowed in open room'));
+            break;
+          }
+
           const peer = getPeer(ws);
           if (!peer) {
             ws.send(errorMessage('not_paired', 'waiting for a peer to join'));
             break;
           }
-          try { peer.send(JSON.stringify({ type: MSG_MSG, payload: msg.payload })); } catch { /* noop */ }
+
+          // Relay verbatim
+          try {
+            if (hasText) {
+              peer.send(JSON.stringify({ type: MSG_MSG, text: msg.text }));
+            } else {
+              peer.send(JSON.stringify({ type: MSG_MSG, ciphertext: msg.ciphertext, nonce: msg.nonce }));
+            }
+          } catch { /* noop */ }
           break;
         }
         default:
