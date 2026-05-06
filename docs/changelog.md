@@ -4,6 +4,14 @@ _Most recent changes appear at the top._
 
 ---
 
+## 2026-05-06 — Task 8c: Phrase-mode message wrap fix
+
+- Removed hard `\n` line breaks from phrase-mode SystemMessage string in chat_screen.dart
+- Body is now one continuous paragraph — Flutter wraps to container width naturally
+- Single `\n` kept between `// phrase mode` header and body (triggers multi-line branch)
+- Branch: task/phrase-message-wrap
+- Commit: fix: phrase-mode message wraps naturally — drop hard line breaks
+
 ## 2026-05-06 — Task 8b: Chat UX polish
 
 - SystemMessage: multi-line text left-aligned with `TextAlign.start`; single-line stays centered
