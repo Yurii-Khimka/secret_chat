@@ -280,6 +280,12 @@ class _JoinRoomScreenState extends State<JoinRoomScreen> {
                 decoration: InputDecoration(
                   counterText: '',
                   contentPadding: EdgeInsets.zero,
+                  hintText: '_',
+                  hintStyle: AppTypography.heading.copyWith(
+                    color: p.textMuted,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w400,
+                  ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(AppRadii.md),
                     borderSide: BorderSide(

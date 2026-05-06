@@ -4,6 +4,19 @@ _Most recent changes appear at the top._
 
 ---
 
+## 2026-05-06 — Task 16: UI polish pass 1
+
+- New `Caret` component: blinking block cursor (530ms cycle, accent-colored)
+- HomeScreen: hero text "No trace" now followed by animated caret
+- HomeScreen: DiagCard line height increased from 1.6 to 1.9 (local override only)
+- JoinRoomScreen: empty code slots show `_` placeholder
+- ChatScreen: composer footer shows `N / 4096` character counter while typing; warning color above 3500
+- RoomSetupScreen: step 03 copy simplified from "Agree on a shared phrase out of band" to "Agree on a shared phrase"
+- 7 audit items explicitly rejected — see result.md rejection ledger
+- Tests: flutter 102 (was 97), server 43 (unchanged)
+- Branch: task/ui-polish-pass-1
+- Commit: feat: ui polish — blinking caret, line height, code slot hints, char counter
+
 ## 2026-05-06 — Task 15: UI fidelity audit
 
 - Created `docs/ui-audit.md`: per-screen, per-component delta list vs design reference

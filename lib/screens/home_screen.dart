@@ -6,6 +6,7 @@ import '../components/app_button.dart';
 import '../theme/theme_controller.dart';
 import '../components/pulse_dot.dart';
 import '../network/chat_client.dart';
+import '../components/caret.dart';
 import 'room_setup_screen.dart';
 import 'join_room_screen.dart';
 import 'settings_screen.dart';
@@ -98,18 +99,20 @@ class _HomeScreenState extends State<HomeScreen> {
                       style: AppTypography.caption.copyWith(color: p.textMuted),
                     ),
                     const SizedBox(height: AppSpacing.md + 2),
-                    Text.rich(
-                      TextSpan(
-                        style: AppTypography.heading.copyWith(color: p.textPrimary),
-                        children: [
-                          const TextSpan(text: 'No accounts.\n'),
-                          const TextSpan(text: 'No history.\n'),
-                          TextSpan(
-                            text: 'No trace',
-                            style: AppTypography.heading.copyWith(color: p.accent),
-                          ),
-                        ],
-                      ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('No accounts.', style: AppTypography.heading.copyWith(color: p.textPrimary)),
+                        Text('No history.', style: AppTypography.heading.copyWith(color: p.textPrimary)),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text('No trace', style: AppTypography.heading.copyWith(color: p.accent)),
+                            const SizedBox(width: AppSpacing.xs),
+                            Caret(palette: p),
+                          ],
+                        ),
+                      ],
                     ),
                     const SizedBox(height: AppSpacing.lg + 2),
                     Text(
@@ -210,11 +213,11 @@ class _DiagRow extends StatelessWidget {
               children: [
                 TextSpan(
                   text: '› ',
-                  style: AppTypography.mono.copyWith(color: palette.textMuted),
+                  style: AppTypography.mono.copyWith(color: palette.textMuted, height: 1.9),
                 ),
                 TextSpan(
                   text: label,
-                  style: AppTypography.mono.copyWith(color: palette.textSecondary),
+                  style: AppTypography.mono.copyWith(color: palette.textSecondary, height: 1.9),
                 ),
               ],
             ),
@@ -223,6 +226,7 @@ class _DiagRow extends StatelessWidget {
             value,
             style: AppTypography.mono.copyWith(
               color: ok ? palette.accent : palette.warning,
+              height: 1.9,
             ),
           ),
         ],
