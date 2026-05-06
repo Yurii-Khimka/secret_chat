@@ -244,16 +244,18 @@ void main() {
 
     test('key bytes are zeroed after close', () async {
       final client = ChatClient();
-      // Manually inject a key to test zeroing
-      // Use debugKeyBytes to verify
       expect(client.debugKeyBytes, isNull);
 
-      // We need to test with a real key — derive one and inject via reflection-like approach
-      // Since we can't connect to a server, test the zeroBytes helper directly on a derived key
       final key = await deriveKey(phrase: 'test', roomCode: 'WOLF-0001');
       expect(key.any((b) => b != 0), true);
       zeroBytes(key);
       expect(key.every((b) => b == 0), true);
+    });
+  });
+
+  group('connect timeout', () {
+    test('timeout constant is 8 seconds', () {
+      expect(ChatClient.connectTimeout, const Duration(seconds: 8));
     });
   });
 }

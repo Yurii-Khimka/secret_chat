@@ -30,7 +30,7 @@
 - [~] Key verification handshake between peers — superseded by Task 10 implicit-mismatch model (decrypt failure → warning + lock)
 
 ### Phase 3 — Polish
-- [ ] Connection error handling + retry UX
+- [x] Connection error handling + retry UX
 - [ ] Smooth session management (foreground/background, network drops)
 - [ ] Final terminal-UI pass against design
 - [ ] App store assets (icons, screenshots, privacy copy)
@@ -302,6 +302,23 @@ Partially done — UX fixes complete, manual verification blocked
 
 ### Branch
 task/flutter-network-client
+
+### Status
+Done
+
+---
+
+## Session 2026-05-06 — Task 13: Connection error handling + retry UX
+
+### Completed
+- ChatClient: 8s connect timeout with `connect_timeout` error code
+- Centralized error_messages.dart with shared mapping
+- JoinRoomScreen: uses shared describeConnectionError
+- RoomSetupScreen: error surface on generate failure, retry with close, post-code drop UX
+- Tests: flutter 81/81 (was 75), server 43/43 (unchanged)
+
+### Branch
+task/connect-error-ux
 
 ### Status
 Done

@@ -53,22 +53,30 @@ class ChatClient extends ChangeNotifier {
     notifyListeners();
   }
 
+  static const Duration _connectTimeout = Duration(seconds: 8);
+
+  @visibleForTesting
+  static Duration get connectTimeout => _connectTimeout;
+
   Future<void> _connect() async {
     if (_channel != null) return;
     _setState(ChatConnectionState.connecting);
+    final channel = WebSocketChannel.connect(ServerConfig.serverUri);
     try {
-      final channel = WebSocketChannel.connect(ServerConfig.serverUri);
-      await channel.ready;
-      _channel = channel;
-      _subscription = channel.stream.listen(
-        _onData,
-        onError: _onError,
-        onDone: _onDone,
-      );
+      await channel.ready.timeout(_connectTimeout);
+    } on TimeoutException {
+      try { await channel.sink.close(); } catch (_) {}
+      _lastError = 'connect_timeout';
+      _setState(ChatConnectionState.error);
+      return;
     } catch (e) {
+      try { await channel.sink.close(); } catch (_) {}
       _lastError = 'connection_failed';
       _setState(ChatConnectionState.error);
+      return;
     }
+    _channel = channel;
+    _subscription = channel.stream.listen(_onData, onError: _onError, onDone: _onDone);
   }
 
   void _onData(dynamic data) {

@@ -4,6 +4,17 @@ _Most recent changes appear at the top._
 
 ---
 
+## 2026-05-06 — Task 13: Connection error handling + retry UX
+
+- ChatClient: 8-second connect timeout (`connect_timeout` error code), bounded `channel.ready`
+- Created `lib/network/error_messages.dart`: centralized error-code → message mapping
+- JoinRoomScreen: deleted inline `_errorMessages` map, uses shared `describeConnectionError`
+- RoomSetupScreen: error surface on generate failure, `close()` before retry, post-code-drop UX (CONNECTION LOST + Retry button resets to pre-generation state)
+- No auto-reconnect — manual retry only
+- Tests: flutter 81 (was 75), server 43 (unchanged)
+- Branch: task/connect-error-ux
+- Commit: feat: connect-error ux — timeout, mapped errors, retry on room setup
+
 ## 2026-05-06 — Task 12: Zero server-side logging audit
 
 - Static audit: all server/src/ files clean — zero leaks (no console.*, no .remoteAddress, no header access)
