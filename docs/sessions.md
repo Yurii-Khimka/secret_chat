@@ -308,6 +308,23 @@ Done
 
 ---
 
+## Session 2026-05-06 — Task 8c: Phrase-mode message wrap fix
+
+### Completed
+- Removed hard `\n` breaks from phrase-mode SystemMessage string
+- Kept single `\n` between header and body for multi-line branch trigger
+- Body is now a single paragraph — Flutter wraps naturally
+- Removed unused import lint warning in test file
+- flutter analyze: clean, flutter test: 36/36, npm test: 35/35
+
+### Branch
+task/phrase-message-wrap
+
+### Status
+Done
+
+---
+
 ## Session 2026-05-06 — Task 8b: Chat UX polish
 
 ### Completed

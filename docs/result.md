@@ -1,49 +1,32 @@
 # Last Task Result
 
 ## Task
-Phase 2 / Task 8b — UX polish: SystemMessage alignment + role-based bubble labels.
+Phase 2 / Task 8c — Phrase-mode message: drop hard line breaks.
 
 ## Branch
-task/chat-ux-polish
+task/phrase-message-wrap
 
 ## Commit
-feat: chat ux polish — left-align multiline system messages, role/nickname bubble labels
+fix: phrase-mode message wraps naturally — drop hard line breaks
 
 ## What Was Done
 
-### SystemMessage alignment (Part B)
-- Single-line messages remain centered (backward-compatible with existing toasts)
-- Multi-line messages (containing `\n`) are now left-aligned with `TextAlign.start` and horizontal padding — no more center-jagged wraps
+Replaced the phrase-mode `SystemMessage` string in `chat_screen.dart`. The old string had hard `\n` breaks at ~40-char boundaries causing a "ladder" effect when Flutter re-wrapped. The new string keeps exactly one `\n` (between `// phrase mode` header and body) so the multi-line branch in `SystemMessage` still triggers, but the body is a single continuous paragraph that Flutter wraps naturally to container width.
 
-### ChatClient state (Part C)
-- Added `isHost` (bool?) and `localNickname` (String?) fields
-- `createRoom()` sets `isHost=true` + nickname; `joinRoom()` sets `isHost=false` + nickname
-- `close()` resets both to null
-- Nickname is trimmed; blank strings become null
+New exact string:
+```
+// phrase mode
+this room requires a shared phrase. type the phrase you agreed on with the other participant as your first message. it acts as the encryption key — messages will be unreadable without an exact case-sensitive match. (encryption arrives in task 9)
+```
 
-### Bubble labels (Part D)
-- Replaced `msg.fromSelf ? 'YOU' : 'PEER'` with `_labelFor(msg)` helper
-- Self messages: show `localNickname` if set, else role (`host`/`peer`)
-- Remote messages: show opposite role (`peer` if host, `host` if peer)
-- Removed `.toUpperCase()` from MessageBubble — labels render lowercase
-- Nicknames truncated at 24 chars
-
-### Wiring (Part E)
-- RoomSetupScreen passes `_nicknameController.text` into `createRoom()`
-- JoinRoomScreen passes `_nicknameController.text` into `joinRoom()`
-
-### Tests (Part F)
-- flutter analyze: no issues
-- flutter test: 36/36 pass (was 27)
-- npm test: 35/35 pass (unchanged)
-
-### Verification
-- `git diff --name-only main..HEAD`: 7 files (no server, no protocol changes)
-- No new dependencies, no crypto
+Also removed an unused `tokens.dart` import from `test/chat_ux_polish_test.dart` (lint fix).
 
 ## Status
 Done
 
 ## Notes
+- `flutter analyze`: no issues
+- `flutter test`: 36/36 (unchanged from Task 8b)
+- `npm test`: 35/35 (unchanged)
+- `git diff --name-only main..HEAD`: `lib/screens/chat_screen.dart`, `test/chat_ux_polish_test.dart`
 - What's next: live verification by Owner, then Task 9 (Argon2id + XChaCha20-Poly1305)
-- Remote peer nickname propagation is deferred — remote bubble always shows role fallback for now

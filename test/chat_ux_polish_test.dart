@@ -6,8 +6,6 @@ import 'package:secret_chat/network/chat_client.dart';
 import 'package:secret_chat/screens/chat_screen.dart';
 import 'package:secret_chat/theme/app_theme.dart';
 import 'package:secret_chat/theme/theme_controller.dart';
-import 'package:secret_chat/tokens/tokens.dart';
-
 void main() {
   late AppTheme theme;
 
