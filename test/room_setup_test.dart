@@ -75,7 +75,7 @@ void main() {
       ));
       await tester.pump();
 
-      expect(find.text('[plaintext — encryption arrives in task 9]'), findsOneWidget);
+      expect(find.text('[open mode \u2014 messages are sent in plaintext]'), findsOneWidget);
     });
 
     testWidgets('passwordMode true shows phrase-mode system message', (tester) async {
@@ -87,7 +87,7 @@ void main() {
 
       expect(find.textContaining('phrase mode'), findsOneWidget);
       expect(find.textContaining('shared phrase'), findsOneWidget);
-      expect(find.text('[plaintext — encryption arrives in task 9]'), findsNothing);
+      expect(find.text('[open mode \u2014 messages are sent in plaintext]'), findsNothing);
     });
   });
 }
@@ -112,4 +112,6 @@ class _FakeChatClient extends ChatClient {
 
   @override
   bool get hasKey => false;
+  @override
+  bool get mismatchDetected => false;
 }

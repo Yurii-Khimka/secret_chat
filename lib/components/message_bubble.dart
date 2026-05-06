@@ -10,22 +10,43 @@ class MessageBubble extends StatelessWidget {
     required this.direction,
     required this.palette,
     this.senderLabel,
+    this.decryptFailed = false,
   });
 
   final String text;
   final MessageDirection direction;
   final AppPalette palette;
   final String? senderLabel;
+  final bool decryptFailed;
 
   @override
   Widget build(BuildContext context) {
     final isSent = direction == MessageDirection.sent;
 
-    final bgColor = isSent ? palette.bubbleSent : palette.bubbleReceived;
-    final textColor = isSent ? palette.bubbleSentText : palette.bubbleReceivedText;
-    final borderColor = isSent
-        ? palette.accent.withValues(alpha: 0.33)
-        : palette.borderHighlight;
+    final Color bgColor;
+    final Color textColor;
+    final Color borderColor;
+    final TextStyle contentStyle;
+    final String displayText;
+
+    if (decryptFailed) {
+      bgColor = palette.surface;
+      textColor = palette.textMuted;
+      borderColor = palette.textMuted;
+      contentStyle = AppTypography.body.copyWith(
+        color: textColor,
+        fontStyle: FontStyle.italic,
+      );
+      displayText = 'unreadable';
+    } else {
+      bgColor = isSent ? palette.bubbleSent : palette.bubbleReceived;
+      textColor = isSent ? palette.bubbleSentText : palette.bubbleReceivedText;
+      borderColor = isSent
+          ? palette.accent.withValues(alpha: 0.33)
+          : palette.borderHighlight;
+      contentStyle = AppTypography.body.copyWith(color: textColor);
+      displayText = text;
+    }
 
     // Asymmetric radii — modern chat feel from screens.jsx
     final radius = isSent
@@ -72,10 +93,7 @@ class MessageBubble extends StatelessWidget {
             border: Border.all(color: borderColor),
             borderRadius: radius,
           ),
-          child: Text(
-            text,
-            style: AppTypography.body.copyWith(color: textColor),
-          ),
+          child: Text(displayText, style: contentStyle),
         ),
       ],
     );

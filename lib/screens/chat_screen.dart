@@ -49,9 +49,12 @@ class _ChatScreenState extends State<ChatScreen> {
     super.dispose();
   }
 
+  bool get _composerDisabled =>
+      _peerLeft || widget.chatClient.mismatchDetected;
+
   void _send() {
     final text = _inputController.text.trim();
-    if (text.isEmpty || _peerLeft) return;
+    if (text.isEmpty || _composerDisabled) return;
     widget.chatClient.sendMessage(text);
     _inputController.clear();
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -75,6 +78,13 @@ class _ChatScreenState extends State<ChatScreen> {
     return client.isHost == true ? 'peer' : 'host';
   }
 
+  String get _hintText {
+    if (_peerLeft) return 'room closed';
+    if (widget.chatClient.mismatchDetected) return 'phrase mismatch \u2014 leave the room';
+    if (widget.chatClient.passwordMode && !widget.chatClient.hasKey) return 'type the phrase\u2026';
+    return 'message';
+  }
+
   void _goHome() {
     widget.chatClient.close();
     Navigator.of(context).popUntil((route) => route.isFirst);
@@ -85,6 +95,8 @@ class _ChatScreenState extends State<ChatScreen> {
     final p = widget.theme.palette;
     final messages = widget.chatClient.messages;
     final code = widget.chatClient.roomCode ?? '----';
+    final mismatch = widget.chatClient.mismatchDetected;
+    final modeLabel = widget.chatClient.passwordMode ? 'ENCRYPTED' : 'PLAINTEXT';
 
     return AppScaffold(
       palette: p,
@@ -108,7 +120,7 @@ class _ChatScreenState extends State<ChatScreen> {
                           child: Padding(
                             padding: const EdgeInsets.only(right: AppSpacing.sm),
                             child: Text(
-                              '‹',
+                              '\u2039',
                               style: AppTypography.heading.copyWith(
                                 color: p.textMuted,
                                 fontSize: 18,
@@ -143,7 +155,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      'PLAINTEXT',
+                      modeLabel,
                       style: AppTypography.micro.copyWith(color: p.textMuted),
                     ),
                     Text(
@@ -160,14 +172,20 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
       // ── Messages ───────────────────────────────────
       body: GestureDetector(
-        onTap: _peerLeft ? _goHome : null,
+        onTap: _composerDisabled ? _goHome : null,
         behavior: HitTestBehavior.translucent,
         child: Column(
           children: [
+            if (mismatch)
+              SystemMessage(
+                text: '// phrase mismatch\nthe phrase you typed does not match the other participant\u2019s. messages cannot be decrypted. leave the room and reconnect to try again.',
+                palette: p,
+                tone: SystemMessageTone.warning,
+              ),
             SystemMessage(
               text: widget.chatClient.passwordMode
-                  ? '// phrase mode\nthis room requires a shared phrase. type the phrase you agreed on with the other participant as your first message. it acts as the encryption key — messages will be unreadable without an exact case-sensitive match. (encryption arrives in task 9)'
-                  : '[plaintext — encryption arrives in task 9]',
+                  ? '// phrase mode\nthis room requires a shared phrase. type the phrase you agreed on with the other participant as your first message. it acts as the encryption key \u2014 messages will be unreadable without an exact case-sensitive match.'
+                  : '[open mode \u2014 messages are sent in plaintext]',
               palette: p,
               tone: SystemMessageTone.warning,
             ),
@@ -195,6 +213,7 @@ class _ChatScreenState extends State<ChatScreen> {
                               : MessageDirection.received,
                           palette: p,
                           senderLabel: _labelFor(msg),
+                          decryptFailed: msg.decryptFailed,
                         ),
                       ),
                     );
@@ -203,7 +222,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   return Padding(
                     padding: const EdgeInsets.only(bottom: AppSpacing.sm + 2),
                     child: SystemMessage(
-                      text: 'peer disconnected — room closed',
+                      text: 'peer disconnected \u2014 room closed',
                       palette: p,
                     ),
                   );
@@ -226,20 +245,20 @@ class _ChatScreenState extends State<ChatScreen> {
                       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
                       decoration: BoxDecoration(
                         color: p.surface,
-                        border: Border.all(color: _peerLeft ? p.border : p.borderHighlight),
+                        border: Border.all(color: _composerDisabled ? p.border : p.borderHighlight),
                         borderRadius: BorderRadius.circular(AppRadii.xl),
                       ),
                       child: Row(
                         children: [
                           Text(
-                            '›',
-                            style: AppTypography.body.copyWith(color: _peerLeft ? p.textMuted : p.accent, fontSize: 13),
+                            '\u203a',
+                            style: AppTypography.body.copyWith(color: _composerDisabled ? p.textMuted : p.accent, fontSize: 13),
                           ),
                           const SizedBox(width: AppSpacing.sm),
                           Expanded(
                             child: TextField(
                               controller: _inputController,
-                              enabled: !_peerLeft,
+                              enabled: !_composerDisabled,
                               style: AppTypography.body.copyWith(color: p.textPrimary),
                               cursorColor: p.accent,
                               cursorWidth: 8,
@@ -249,24 +268,20 @@ class _ChatScreenState extends State<ChatScreen> {
                                 isDense: true,
                                 contentPadding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
                                 border: InputBorder.none,
-                                hintText: _peerLeft
-                                    ? 'room closed'
-                                    : (widget.chatClient.passwordMode && !widget.chatClient.hasKey)
-                                        ? 'type the phrase\u2026'
-                                        : 'message',
+                                hintText: _hintText,
                                 hintStyle: AppTypography.body.copyWith(color: p.textMuted),
                               ),
                             ),
                           ),
                           GestureDetector(
-                            onTap: _peerLeft ? null : _send,
+                            onTap: _composerDisabled ? null : _send,
                             child: Container(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: AppSpacing.sm + 2,
                                 vertical: AppSpacing.sm - 2,
                               ),
                               decoration: BoxDecoration(
-                                color: _peerLeft ? p.textMuted : p.accent,
+                                color: _composerDisabled ? p.textMuted : p.accent,
                                 borderRadius: BorderRadius.circular(AppRadii.sm),
                               ),
                               child: Text(
@@ -287,11 +302,11 @@ class _ChatScreenState extends State<ChatScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          'PLAINTEXT',
+                          modeLabel,
                           style: AppTypography.micro.copyWith(color: p.textMuted),
                         ),
                         Text(
-                          _peerLeft ? 'TAP ANYWHERE TO EXIT' : 'TAP TO TYPE',
+                          _composerDisabled ? 'TAP ANYWHERE TO EXIT' : 'TAP TO TYPE',
                           style: AppTypography.micro.copyWith(color: p.textMuted),
                         ),
                       ],

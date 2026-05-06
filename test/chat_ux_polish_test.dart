@@ -178,6 +178,8 @@ class _FakeChatClient extends ChangeNotifier implements ChatClient {
   bool get passwordMode => false;
   @override
   bool get hasKey => false;
+  @override
+  bool get mismatchDetected => false;
 
   @override
   Future<void> createRoom({bool passwordMode = false, String? nickname}) async {}
