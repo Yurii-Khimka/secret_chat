@@ -4,216 +4,210 @@ _Updated by the Tech Lead chat before each task._
 
 ## Status
 
-**Active task:** Phase 2 / Task 11 — **Security cleanup: memory wipe on close + lifecycle hardening**.
+**Active task:** Phase 2 / Task 12 — **Zero server-side logging audit**.
 
-Project rule from [docs/readme.md](readme.md): _"When the app is closed — everything is deleted."_ Today's `ChatClient.close()` nulls references but does not zero the underlying key bytes, and the WebSocket close path is best-effort. This task makes "everything deleted" a verified contract: the symmetric key bytes are zeroed before being released, all ephemeral state is cleared, the socket is forcibly torn down, and the lifecycle observer covers the cases that actually matter on iOS / Android.
+Project rule from [docs/readme.md](readme.md):
+
+> No IP address logging. No data stored on the server.
+
+The server has been written from day one with a "no client data" rule (see hard-rule comment at the top of [server/src/ws.js](../server/src/ws.js)). Task 12 makes that rule **enforced by tests** rather than enforced by discipline. The audit also locks the contract in writing.
 
 ## Context
 
-### What close() does today
+### Current logging surface
 
-[lib/network/chat_client.dart:265-283](../lib/network/chat_client.dart):
+A quick survey of [server/src/](../server/src/) shows the logging surface is already minimal:
 
-```dart
-Future<void> close() async {
-  final channel = _channel;
-  _channel = null;
-  _subscription?.cancel();
-  _subscription = null;
-  _roomCode = null;
-  _lastError = null;
-  _passwordMode = false;
-  _isHost = null;
-  _localNickname = null;
-  _messages.clear();
-  _key = null;             // <-- just drops the reference
-  _pendingDecrypt.clear();
-  _state = ChatConnectionState.idle;
-  try {
-    await channel?.sink.close();
-  } catch (_) {}
-  notifyListeners();
-}
+```
+log.js:    info() → process.stdout.write    (lifecycle)
+log.js:    warn() → process.stderr.write    (lifecycle)
+server.js: info('server listening on …')    (startup)
+index.js:  info('shutting down')            (SIGINT/SIGTERM)
+index.js:  warn('shutdown timed out …')     (fatal timeout)
 ```
 
-Gaps (in priority order):
+Three call sites total. None of them are on the data path. Task 12's job is to:
 
-1. **`_key = null` does not zero the bytes.** The `Uint8List` lives on the Dart heap until GC. A heap snapshot taken between `close()` and the next GC cycle still contains the 32 derived bytes. Same for buffered ciphertexts.
-2. **`_mismatchDetected` is not reset here** (Task 10 added a reset in close, but verify; if missing, add it).
-3. **`_messages.clear()` releases the list backing but the `ChatMessage.text` strings — including any plaintext the user typed and any peer plaintext — remain in heap until GC.** Strings are immutable in Dart, so we cannot zero them. Best we can do: drop the references promptly and document the limit.
-4. **`channel?.sink.close()` is awaited but not bounded.** A misbehaving network can hang it. The rest of `close()` already ran, so the visible state is clean, but it leaves a pending future. Add a short timeout.
-5. **`paused` lifecycle does NOT close the session** — this was an explicit Task 7b decision (preserve session through backgrounding). Confirm that's still the right call given Task 11's threat model. I am keeping it: backgrounding-then-foregrounding-the-app is a routine UX flow on mobile and breaking the room there would be hostile. We lean on `detached` for cleanup, plus an explicit "leave" gesture.
-6. **No app-level guard against returning to a screen after close.** If `close()` runs while ChatScreen is on top (e.g. `detached`), the `_messages.clear()` happens but the ListView may rebuild with stale state. Verify this is harmless (it should be — `_state` flips to `idle` and listeners fire).
+1. **Verify** the data path stays silent under realistic traffic (create → join → relay → bad frames → disconnect).
+2. **Verify** no IP / header / URL-query / frame-content capture exists anywhere in the codebase, even outside the logger (e.g. accidental `req.socket.remoteAddress` reads, header reflection in errors).
+3. **Lock** the allowed-log-line set so future PRs can't quietly add a `console.log(payload)`.
+4. **Document** the contract in one canonical place.
 
-### What `crypto.dart` exposes today
+### What "data path" means precisely
 
-`deriveKey()` returns a fresh `Uint8List`. It's the only producer of key bytes. We can zero those bytes when the client is done with them.
+Any code reachable from a WebSocket message arriving at the server. Specifically:
 
-### What we cannot do
+- `ws.js`'s `connection` handler (frame parsing, dispatch, error replies).
+- `protocol.js` (`parseMessage`, `errorMessage`).
+- `rooms.js` (`createRoom`, `joinRoom`, `leaveRoom`, `getPeer`, `removeRoom`).
+- `wordlist.js` (room-code generation).
 
-- **We cannot zero the AES-key copies inside the `cryptography` package.** `SecretKey` and `Argon2id` internals make their own buffers. This is acceptable per the project's threat model (we are not defending against a compromised process with heap access — that's out of scope for a chat app on a phone).
-- **We cannot zero `String` plaintexts.** Dart strings are immutable.
-- **We are not introducing a native FFI just to call `mlock`/`memset_s`.** Out of scope.
+The only allowed log calls are **lifecycle**:
+- Server startup (one line, includes host/port/ws-path — none are client-derived).
+- Server shutdown (one line, no client data).
+- Shutdown timeout (one line, no client data).
+- Fatal errors that cause the process to exit (uncaught exceptions, configuration failures at boot).
 
-What we *can* do is zero the one buffer we own (`_key`), drop references promptly, document the limits, and add a test that asserts the contract.
+Anything else — including a debug log of "room created with code X" — is **forbidden**, because room codes are still ephemeral session identifiers; the codebase already trusts this rule and we're locking it in.
+
+### What we are NOT doing
+
+- Not adding a logging framework (winston, pino, etc.). The current `log.js` is fine.
+- Not adding log levels beyond `info`/`warn`. No `debug`.
+- Not adding a "redact this field" helper — the contract is "don't log it at all," not "log a scrubbed version."
+- Not changing what the server returns to clients (error frames stay as-is).
+- Not changing the Flutter side of the project. Client-side logging audit is a separate task if needed.
 
 ## Read First
 
 - [CLAUDE.md](../CLAUDE.md)
-- [docs/result.md](result.md) — Task 10 closeout
-- [docs/sessions.md](sessions.md) — locked Phase 2 constraints (especially "Phrase / key — never stored, never exposed")
-- [docs/readme.md](readme.md) — "When the app is closed — everything is deleted"
+- [docs/result.md](result.md) — Task 11 closeout
+- [docs/sessions.md](sessions.md) — Phase 2 locked constraints
+- [docs/readme.md](readme.md) — "No IP address logging"
 - [docs/changelog.md](changelog.md)
-- [lib/main.dart](../lib/main.dart) — app lifecycle observer
-- [lib/network/chat_client.dart](../lib/network/chat_client.dart) — `close()`, `_key`, `_pendingDecrypt`
-- [lib/network/crypto.dart](../lib/network/crypto.dart) — key derivation
-- [test/network/chat_client_test.dart](../test/network/chat_client_test.dart)
+- [server/src/log.js](../server/src/log.js)
+- [server/src/ws.js](../server/src/ws.js) — top-of-file hard rule comment
+- [server/src/server.js](../server/src/server.js)
+- [server/src/index.js](../server/src/index.js)
+- [server/src/protocol.js](../server/src/protocol.js)
+- [server/src/rooms.js](../server/src/rooms.js)
+- [server/test/smoke.test.js](../server/test/smoke.test.js) — existing test patterns
+- [server/README.md](../server/README.md) — where the contract gets documented
 
 ## Current Task
 
 ### Part A — Branching
 
-1. Switch to `main`. Merge `task/decrypt-failure-ux` into `main` (no fast-forward).
-2. Delete the local `task/decrypt-failure-ux` branch.
-3. Branch off `main` as `task/security-cleanup`.
+1. Switch to `main`. Merge `task/security-cleanup` into `main` (no fast-forward).
+2. Delete the local `task/security-cleanup` branch.
+3. Branch off `main` as `task/server-logging-audit`.
 
-### Part B — Zero the key bytes on `close()`
+### Part B — Static audit (read-only first pass)
 
-In [lib/network/chat_client.dart](../lib/network/chat_client.dart):
+Walk every file under `server/src/` and classify each potentially-logging or potentially-PII operation. **Produce no code changes in this part** — the goal is to confirm the surface before writing tests.
 
-1. Before `_key = null`, if `_key != null`, fill it with zeros:
-   ```dart
-   final k = _key;
-   if (k != null) {
-     for (var i = 0; i < k.length; i++) {
-       k[i] = 0;
-     }
-   }
-   _key = null;
-   ```
-   The byte loop is intentional — `Uint8List.fillRange(0, k.length, 0)` is equivalent and acceptable; pick whichever you prefer for readability. **Do not** simply `_key = Uint8List(0)` — that allocates a new buffer and leaves the old one untouched.
-2. Also zero each buffered ciphertext. `_PendingCiphertext` holds `String`s (`ciphertext`, `nonce`) which we cannot zero, but we can clear the list before the iteration so references drop ASAP. Replace `_pendingDecrypt.clear()` placement: clear it as the *first* mutation in `close()`, not in the middle.
+For each, record (in your scratch notes, will go into result.md):
 
-### Part C — Bounded socket teardown
+1. **Logging primitives**: every `console.*`, `process.stdout.*`, `process.stderr.*`, every call to `info`/`warn`/`error` exported from `log.js`. Expected hits: 3 call sites + the 2 inside `log.js`.
+2. **PII / network-identifier reads**: every reference to `req.socket.remoteAddress`, `req.connection.remoteAddress`, `req.headers`, `req.url` (beyond the WS upgrade path check), `x-forwarded-for`, `x-real-ip`. Expected hits: 0.
+3. **Frame-content reflection**: every place where data from a parsed message (`text`, `ciphertext`, `nonce`, `code`, `nickname`, etc.) is interpolated into an error reply, log line, or stack trace. Expected: error frames carry only fixed `code` + fixed `reason` strings — zero echoing of client input. Confirm.
+4. **Stack traces**: any `error.stack` that could land in `process.stderr` and reveal client input via interpolation. Expected: none reach the data path.
 
-In `close()`:
+If any item in 2/3/4 is found, **fix it in this task** (it's the audit; the audit fixing what it finds is in scope).
 
-1. Wrap `channel?.sink.close()` in a `Future.any` race against a 1-second timer. Whichever completes first wins. Reason: a hung sink should not delay the UI from observing the cleared state.
-   ```dart
-   try {
-     await Future.any([
-       channel?.sink.close() ?? Future.value(),
-       Future.delayed(const Duration(seconds: 1)),
-     ]);
-   } catch (_) {}
-   ```
-2. The existing `try/catch` stays — sink close can throw on already-closed channels, that's fine.
+### Part C — Logging contract test (the load-bearing piece)
 
-### Part D — Reset `_mismatchDetected` defensively
+New file: [server/test/logging.test.js](../server/test/logging.test.js).
 
-Confirm Task 10's `close()` already resets `_mismatchDetected = false`. If not, add it. (This is a verification step — the implementation may already be correct.)
+Purpose: drive a realistic session through the real server stack and prove zero data-path logs are emitted. Lifecycle logs (startup, shutdown) are explicitly allowed and asserted by name.
 
-### Part E — `_messages` clearing — document the limit
+Structure:
 
-`ChatMessage` instances hold `String text` references. We cannot zero strings. Add a single-line comment in `close()` above `_messages.clear()`:
+```js
+import { test } from 'node:test';
+import assert from 'node:assert';
+import { startServer, stopServer } from '../src/server.js'; // or whatever the real entrypoint exposes
 
-```dart
-// Strings are immutable; clearing the list drops references but does not zero memory.
-```
-
-This is the only comment we add. Do not annotate the rest of close().
-
-### Part F — Idempotent close
-
-`close()` should be safe to call twice (e.g. `detached` lifecycle + an explicit Home navigation racing). Today, the second call would: encounter `_channel == null`, the `_key` zero-loop skips because `_key == null`, list clears are no-ops, and `notifyListeners()` fires harmlessly. That is acceptable as-is. **Add a test** to lock the behavior in (Part I).
-
-### Part G — Lifecycle: keep `detached`-only
-
-In [lib/main.dart](../lib/main.dart):
-
-- **No change to lifecycle policy.** `paused` does not close. `detached` does. This was deliberately decided in Task 7b and remains correct: `paused` fires for routine backgrounding (notification shade, app-switcher, lock screen) and breaking the chat there is hostile UX.
-- Add a short comment above `didChangeAppLifecycleState` explaining the policy if not already adequate. Keep the existing comment if it's clear; don't expand for the sake of expansion.
-
-### Part H — Crypto module: defensive zeroing helper
-
-In [lib/network/crypto.dart](../lib/network/crypto.dart), add a small public helper:
-
-```dart
-/// Zeros [bytes] in place. Safe to call on a null reference.
-void zeroBytes(Uint8List? bytes) {
-  if (bytes == null) return;
-  bytes.fillRange(0, bytes.length, 0);
+// Capture every byte that hits stdout/stderr during the test.
+function captureStdio(fn) {
+  const stdout = [];
+  const stderr = [];
+  const origOut = process.stdout.write.bind(process.stdout);
+  const origErr = process.stderr.write.bind(process.stderr);
+  process.stdout.write = (chunk) => { stdout.push(chunk.toString()); return true; };
+  process.stderr.write = (chunk) => { stderr.push(chunk.toString()); return true; };
+  try { return { stdout, stderr, result: fn() }; }
+  finally { process.stdout.write = origOut; process.stderr.write = origErr; }
 }
 ```
 
-ChatClient uses this in `close()` instead of an inline loop. Reason: keeps all crypto-adjacent primitives in one module, matches the existing convention.
+Tests:
 
-Add unit tests in [test/network/crypto_test.dart](../test/network/crypto_test.dart):
+1. **Lifecycle-only baseline**: start server → assert stdout contains exactly one line matching `/server listening on/`, stderr empty. Stop server → assert one additional `/shutting down/` line, stderr still empty.
 
-- `zeroBytes(null)` is a no-op (does not throw).
-- `zeroBytes(Uint8List)` sets every byte to 0.
-- `zeroBytes` on the output of `deriveKey` zeros the key (round-trip: derive → zero → bytes are all 0).
+2. **Data-path silence**: start server, open two WS clients, run a full session:
+   - Client A sends `create_room`.
+   - Client B sends `join_room`.
+   - A and B exchange 3 plaintext `msg` frames each.
+   - Open a *new* room with `password_mode: true` and exchange 3 ciphertext `msg` frames each.
+   - A sends 3 *malformed* frames: oversized (4097-char text), bad shape (both text and ciphertext), unknown type.
+   - Disconnect A (close), then B observes `peer_left`.
+   - Stop server.
 
-### Part I — Tests in `chat_client_test.dart`
+   Capture stdout+stderr across the whole session. **Assert**: exactly the 2 lifecycle lines (`server listening`, `shutting down`). No additional lines. No occurrence of any of the strings sent by clients (room codes, nicknames, ciphertexts, nonces, plaintexts) in either stream.
 
-In [test/network/chat_client_test.dart](../test/network/chat_client_test.dart), add a new group `close() — security cleanup`:
+3. **Error frames don't leak inputs**: send a `join_room` with code `WOLF-9999` (nonexistent). Capture the error reply and the stdio. Assert: stdio contains zero occurrences of `WOLF-9999`. Error reply's `reason` is the fixed string for that error code (never the client's input).
 
-- After `close()`, `chatClient.hasKey == false`, `chatClient.mismatchDetected == false`, `chatClient.roomCode == null`, `chatClient.localNickname == null`, `chatClient.isHost == null`, `chatClient.passwordMode == false`, `chatClient.messages.isEmpty == true`, `chatClient.state == ChatConnectionState.idle`.
-- Calling `close()` twice in a row does not throw and produces the same final state.
-- **Key-zeroing test (the load-bearing one):** Inject or expose a way to capture the `Uint8List` reference held by `_key` *before* close(). Options:
-  1. Add a `@visibleForTesting` getter `Uint8List? get debugKeyBytes => _key;` to ChatClient. Capture the reference, run close(), assert every byte is 0.
-  2. Or: refactor `_key` setter to call `zeroBytes` on the previous value when overwritten and test that path. This is more invasive — pick option 1.
-  Use `@visibleForTesting` annotation from `package:meta`. The getter exists for tests only.
-- Bounded teardown test: not feasible without a fake WebSocketChannel that hangs `sink.close`. Skip — covered by code review and the existing `close()` integration test count.
+4. **No remoteAddress access**: this is a static check, not a runtime one. Use `fs.readFileSync` to read each file in `server/src/` and assert none contain the strings `remoteAddress`, `x-forwarded-for`, `x-real-ip`. (The current `ws.js` comment mentions `remoteAddress` to forbid it — exempt comment lines: strip lines starting with `//` or inside `/* */` before the assertion. Implementation: a tiny regex pass is fine.)
 
-### Part J — `flutter analyze`, `flutter test`, `npm test`
+   The exemption needs care — match the *forbidden access* pattern, not the literal word. A pragmatic rule: assert no source file contains `.remoteAddress` (with the leading dot) outside comments. That catches `req.socket.remoteAddress` and `req.connection.remoteAddress` while letting the existing forbidding-comment in `ws.js` pass.
 
-All clean. New flutter test count grows from 69. Server tests stay at 39 (no server changes).
+### Part D — Document the contract
 
-### Part K — Commit
+Add a section to [server/README.md](../server/README.md) titled `## Logging contract`. Write it concisely (≤ 15 lines). Content:
+
+- The only log lines this server emits are: server startup (one line), server shutdown (one line), shutdown timeout warning (one line).
+- The server logs zero client-derived data: no IP addresses, no headers, no URL params, no frame contents, no room codes, no nicknames, no error reasons that echo client input.
+- This contract is enforced by [server/test/logging.test.js](../server/test/logging.test.js). New `console.*` / `info()` / `warn()` calls on the data path will fail that test.
+- If lifecycle lines need to change (e.g. process supervisor wants a different format), update the test's expected line set in the same commit.
+
+### Part E — Reinforce ws.js header comment
+
+The hard-rule comment at the top of [server/src/ws.js](../server/src/ws.js) is good. Add one line pointing to the test file:
+
+```
+// Enforced by server/test/logging.test.js — that test will fail if a console.log
+// or info() call lands on the data path.
+```
+
+No other changes to `ws.js`.
+
+### Part F — `npm test`, `flutter test`, `flutter analyze`
+
+- `npm test`: count grows from 39 (expect ~43 — 4 new logging tests).
+- `flutter test`: unchanged at 75.
+- `flutter analyze`: clean (untouched, but run anyway).
+
+### Part G — Commit
 
 One commit:
 
-`chore: security cleanup — zero key bytes on close + bounded socket teardown`
+`chore: server logging audit — lock zero-data-path-log contract`
 
-### Part L — Output (in your response and at the top of `result.md`)
+### Part H — Output (in your response and at the top of `result.md`)
 
-- Confirm `flutter analyze` clean.
-- `flutter test` count vs. Task 10's 69.
-- `npm test` count (expect unchanged: 39).
-- `git diff --name-only main..HEAD` — expect changes in: `chat_client.dart`, `crypto.dart`, `chat_client_test.dart`, `crypto_test.dart`.
-- A note confirming the key-zeroing test passes (i.e. captured `Uint8List` is all zero after `close()`).
-- A note on the `paused`-lifecycle policy: confirm the existing `detached`-only branch is intentional and unchanged.
+- The **static audit findings table**: each file in `server/src/`, each logging/PII access (with line number), classification (allowed lifecycle / forbidden / not-present). This is the primary evidence the audit was actually performed.
+- Confirm `npm test` count vs. Task 11's 39.
+- Confirm `flutter test` unchanged at 75, `flutter analyze` clean.
+- `git diff --name-only main..HEAD` — expect: `ws.js` (one comment line), `server/README.md` (new section), `server/test/logging.test.js` (new file). And `result.md`/`sessions.md`/`changelog.md` per CLAUDE.md.
+- Note: if the audit found and fixed any actual leak, call it out clearly. (If it found none, say so explicitly — that's the expected outcome and worth confirming.)
 
-### Part M — Update docs/result.md, docs/sessions.md, docs/changelog.md
+### Part I — Update docs/result.md, docs/sessions.md, docs/changelog.md
 
 Per CLAUDE.md §4–§6.
 
 In sessions.md, tick:
-- [x] Session cleanup on app close (memory wipe)
+- [x] Verify zero server-side logging (no IPs, no payloads, no metadata beyond room code)
 
-Leave "Verify zero server-side logging" unchecked — that is the next task.
-
-Note in sessions.md that "Key verification handshake between peers" is **superseded by Task 10's implicit-mismatch model** (decryption failure ⇒ mismatch warning + composer lock). Mark it `[~]` or add a one-line comment crossing it out — do not delete.
+That closes the last actionable Phase 2 item (key-verification handshake is already marked superseded). Note in sessions.md that **Phase 2 — Security is now complete**.
 
 ## Specs
 
-- Branch: `task/security-cleanup` (off `main`, after merging Task 10).
+- Branch: `task/server-logging-audit` (off `main`, after merging Task 11).
 - One commit at the end.
-- No new dependencies.
-- No protocol or server changes.
-- No new components, screens, or tokens.
-- No native FFI.
+- No new dependencies (Node built-in test runner only).
+- No new server code paths; only a comment line in `ws.js`, a README section, and a test file.
+- No client-side changes.
 
 ## Do NOT
 
-- Do not log key bytes, plaintexts, ciphertexts, or any portion thereof — the existing rules still hold.
-- Do not change lifecycle policy (paused stays a no-op).
-- Do not introduce a native crypto plugin.
-- Do not zero memory you don't own — `cryptography` package internals are out of scope.
-- Do not add a "are you sure you want to leave" prompt — close is silent, immediate, total.
+- Do not add a logging framework or new log levels.
+- Do not add a "scrub" / "redact" helper. The rule is don't-log, not log-then-scrub.
+- Do not change error frame shapes or codes.
+- Do not log room codes "for debugging" anywhere — the contract treats them as session-ephemeral.
+- Do not silence any *existing* lifecycle line (startup/shutdown). The audit confirms them; it doesn't remove them.
 - Do not push the branch.
 
 ## Commit Message
 
-`chore: security cleanup — zero key bytes on close + bounded socket teardown`
+`chore: server logging audit — lock zero-data-path-log contract`

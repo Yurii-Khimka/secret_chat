@@ -25,7 +25,7 @@
 - [x] Task 7 — Flutter WS client + real pairing (no crypto yet) (`task/flutter-network-client`)
 - [ ] Argon2 password → key derivation on device
 - [ ] AES-256 message encryption on device
-- [ ] Verify zero server-side logging (no IPs, no payloads, no metadata beyond room code)
+- [x] Verify zero server-side logging (no IPs, no payloads, no metadata beyond room code)
 - [x] Session cleanup on app close (memory wipe)
 - [~] Key verification handshake between peers — superseded by Task 10 implicit-mismatch model (decrypt failure → warning + lock)
 
@@ -302,6 +302,24 @@ Partially done — UX fixes complete, manual verification blocked
 
 ### Branch
 task/flutter-network-client
+
+### Status
+Done
+
+---
+
+## Session 2026-05-06 — Task 12: Zero server-side logging audit
+
+### Completed
+- Static audit of all server/src/ files: zero leaks found
+- Created server/test/logging.test.js: 4 tests (lifecycle baseline, data-path silence, error non-leak, static scan)
+- Updated server/README.md: "Logging contract" section referencing test
+- Added enforcement comment to ws.js
+- flutter analyze: clean, flutter test: 75/75 (unchanged), npm test: 43/43 (was 39)
+- **Phase 2 — Security is now complete**
+
+### Branch
+task/server-logging-audit
 
 ### Status
 Done
