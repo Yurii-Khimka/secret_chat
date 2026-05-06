@@ -65,6 +65,16 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
+  String _labelFor(IncomingMessage msg) {
+    final client = widget.chatClient;
+    if (msg.fromSelf) {
+      final nick = client.localNickname;
+      if (nick != null) return nick.length > 24 ? nick.substring(0, 24) : nick;
+      return client.isHost == true ? 'host' : 'peer';
+    }
+    return client.isHost == true ? 'peer' : 'host';
+  }
+
   void _goHome() {
     widget.chatClient.close();
     Navigator.of(context).popUntil((route) => route.isFirst);
@@ -184,7 +194,7 @@ class _ChatScreenState extends State<ChatScreen> {
                               ? MessageDirection.sent
                               : MessageDirection.received,
                           palette: p,
-                          senderLabel: msg.fromSelf ? 'YOU' : 'PEER',
+                          senderLabel: _labelFor(msg),
                         ),
                       ),
                     );

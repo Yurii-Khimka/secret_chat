@@ -68,7 +68,10 @@ class _RoomSetupScreenState extends State<RoomSetupScreen> {
   Future<void> _generateCode() async {
     setState(() => _generating = true);
     widget.chatClient.addListener(_onClientChanged);
-    await widget.chatClient.createRoom(passwordMode: _passwordMode);
+    await widget.chatClient.createRoom(
+      passwordMode: _passwordMode,
+      nickname: _nicknameController.text,
+    );
     _onClientChanged();
   }
 

@@ -18,6 +18,8 @@ class ChatClient extends ChangeNotifier {
   String? _roomCode;
   String? _lastError;
   bool _passwordMode = false;
+  bool? _isHost;
+  String? _localNickname;
   final List<IncomingMessage> _messages = [];
 
   WebSocketChannel? _channel;
@@ -27,6 +29,8 @@ class ChatClient extends ChangeNotifier {
   String? get roomCode => _roomCode;
   String? get lastError => _lastError;
   bool get passwordMode => _passwordMode;
+  bool? get isHost => _isHost;
+  String? get localNickname => _localNickname;
   List<IncomingMessage> get messages => List.unmodifiable(_messages);
 
   void _setState(ChatConnectionState s) {
@@ -99,20 +103,24 @@ class ChatClient extends ChangeNotifier {
     _setState(ChatConnectionState.closed);
   }
 
-  Future<void> createRoom({bool passwordMode = false}) async {
+  Future<void> createRoom({bool passwordMode = false, String? nickname}) async {
     _lastError = null;
+    _isHost = true;
+    _localNickname = nickname?.trim().isNotEmpty == true ? nickname!.trim() : null;
     await _connect();
     if (_state == ChatConnectionState.error) return;
     _channel?.sink.add(createRoomFrame(passwordMode: passwordMode));
   }
 
-  Future<void> joinRoom(String code) async {
+  Future<void> joinRoom(String code, {String? nickname}) async {
     if (!kCodeRegex.hasMatch(code)) {
       _lastError = 'bad_message';
       _setState(ChatConnectionState.error);
       return;
     }
     _lastError = null;
+    _isHost = false;
+    _localNickname = nickname?.trim().isNotEmpty == true ? nickname!.trim() : null;
     await _connect();
     if (_state == ChatConnectionState.error) return;
     _channel?.sink.add(joinRoomFrame(code));
@@ -138,6 +146,8 @@ class ChatClient extends ChangeNotifier {
     _roomCode = null;
     _lastError = null;
     _passwordMode = false;
+    _isHost = null;
+    _localNickname = null;
     _messages.clear();
     _state = ChatConnectionState.idle;
     try {

@@ -55,7 +55,7 @@ class MessageBubble extends StatelessWidget {
               bottom: AppSpacing.xs,
             ),
             child: Text(
-              senderLabel!.toUpperCase(),
+              senderLabel!,
               style: AppTypography.bubbleLabel.copyWith(color: palette.textMuted),
             ),
           ),

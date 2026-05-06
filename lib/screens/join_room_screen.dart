@@ -112,7 +112,7 @@ class _JoinRoomScreenState extends State<JoinRoomScreen> {
       _error = null;
     });
     widget.chatClient.addListener(_onClientChanged);
-    await widget.chatClient.joinRoom(_roomCode);
+    await widget.chatClient.joinRoom(_roomCode, nickname: _nicknameController.text);
     _onClientChanged();
   }
 
