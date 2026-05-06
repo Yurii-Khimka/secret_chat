@@ -308,6 +308,24 @@ Done
 
 ---
 
+## Session 2026-05-06 — Task 8b: Chat UX polish
+
+### Completed
+- SystemMessage: multi-line text left-aligned, single-line stays centered
+- ChatClient: added `isHost` + `localNickname` state fields
+- ChatScreen: bubble labels use role/nickname instead of YOU/PEER
+- Removed `.toUpperCase()` from MessageBubble
+- Wired nickname from RoomSetupScreen and JoinRoomScreen into ChatClient
+- flutter analyze: clean, flutter test: 36/36 (was 27), npm test: 35/35
+
+### Branch
+task/chat-ux-polish
+
+### Status
+Done
+
+---
+
 ## Session 2026-05-05 — Task 8: Room Setup + password_mode protocol flag
 
 ### Completed

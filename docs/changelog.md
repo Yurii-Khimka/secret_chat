@@ -4,6 +4,17 @@ _Most recent changes appear at the top._
 
 ---
 
+## 2026-05-06 — Task 8b: Chat UX polish
+
+- SystemMessage: multi-line text left-aligned with `TextAlign.start`; single-line stays centered
+- ChatClient: added `isHost` (bool?) and `localNickname` (String?) — set on create/join, cleared on close
+- Bubble labels: replaced hardcoded `YOU`/`PEER` with role/nickname-aware `_labelFor()` helper
+- Removed `.toUpperCase()` from MessageBubble — labels render lowercase as-is
+- Wired nickname controllers from RoomSetupScreen and JoinRoomScreen into ChatClient calls
+- Tests: flutter 36/36 (was 27), server 35/35 unchanged
+- Branch: task/chat-ux-polish
+- Commit: feat: chat ux polish — left-align multiline system messages, role/nickname bubble labels
+
 ## 2026-05-05 — Task 8: Room Setup + password_mode protocol flag
 
 - Server: `create_room` accepts `password_mode` bool, echoed in `room_created`, included in `joined` for joiner
