@@ -32,6 +32,7 @@
 ### Phase 3 — Polish
 - [x] Connection error handling + retry UX
 - [x] Smooth session management (foreground/background, network drops)
+- [x] Activation gate v1 — ed25519-signed access codes (`task/activation-gate-v1`)
 - [ ] Final terminal-UI pass against design — audit at docs/ui-audit.md (Task 15 · 2026-05-06); first polish pass shipped via task/ui-polish-pass-1 (Task 16)
 - [ ] App store assets (icons, screenshots, privacy copy)
 - [ ] iOS + Android release builds
@@ -302,6 +303,27 @@ Partially done — UX fixes complete, manual verification blocked
 
 ### Branch
 task/flutter-network-client
+
+### Status
+Done
+
+---
+
+## Session 2026-05-06 — Task 17: Activation gate v1
+
+### Completed
+- ed25519-signed activation codes — owner-side keygen + mint tools
+- Embedded public key placeholder (all zeros) locks unconfigured builds
+- `verifyActivationCode()` with whitespace tolerance, placeholder rejection
+- `ActivationController` with load/persist/re-verify on startup
+- ActivationScreen — terminal-aesthetic, paste-only, reuses Caret/PulseDot/AppButton
+- main.dart gates HomeScreen behind activation via Listenable.merge
+- 21 new tests (11 verification, 6 controller, 4 screen)
+- docs/readme.md: "Activation (v1)" section added
+- Tests: flutter 123 (was 102), server 43 (unchanged)
+
+### Branch
+task/activation-gate-v1
 
 ### Status
 Done

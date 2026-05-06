@@ -2,6 +2,18 @@
 
 A secure, anonymous mobile chat app for iOS and Android. Built with Flutter. The app has one goal — let two people chat privately, with no trace left behind.
 
+## Activation (v1)
+
+The app requires an owner-issued activation code on first launch. Codes are signed with an ed25519 private key kept offline by the project owner. The public key is embedded in the binary — bypassing the gate requires forking and rebuilding the app.
+
+For collaborators who build the app:
+1. `dart run tools/keygen.dart` (once) — generates a keypair
+2. Paste the printed public key array into `lib/security/activation_pubkey.dart`
+3. `dart run tools/mint_code.dart` — produces one activation code per run
+4. DM codes to invitees
+
+The placeholder pubkey shipped in the repo (all zeros) locks the app — production builds must replace it.
+
 ## Core Rules
 
 - No user accounts

@@ -7,8 +7,14 @@ import 'package:secret_chat/theme/palettes/lime_palette.dart';
 import 'package:secret_chat/theme/palettes/mint_palette.dart';
 import 'package:secret_chat/theme/palettes/indigo_palette.dart';
 import 'package:secret_chat/network/chat_client.dart';
+import 'package:secret_chat/security/activation_controller.dart';
+import 'package:secret_chat/security/activation.dart';
+
+import 'helpers/activation_helpers.dart';
 
 void main() {
+  tearDown(() => setActivationPublicKeyForTesting(null));
+
   group('Theme persistence', () {
     testWidgets('cold start loads Lime when persisted', (tester) async {
       SharedPreferences.setMockInitialValues({'app.theme': 'lime'});
@@ -27,11 +33,17 @@ void main() {
     });
 
     testWidgets('tapping Indigo in Settings persists choice', (tester) async {
-      SharedPreferences.setMockInitialValues({});
+      final validCode = await generateTestActivationCode();
+      SharedPreferences.setMockInitialValues({'activation.code': validCode});
       final controller = ThemeController();
       await controller.load();
-
-      await tester.pumpWidget(SecretChatApp(controller: controller, chatClient: ChatClient()));
+      final activation = ActivationController();
+      await activation.load();
+      await tester.pumpWidget(SecretChatApp(
+        controller: controller,
+        chatClient: ChatClient(),
+        activationController: activation,
+      ));
       await tester.pump();
 
       // Navigate to Settings

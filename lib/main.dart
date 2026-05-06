@@ -1,25 +1,39 @@
 import 'package:flutter/material.dart';
 import 'theme/theme_controller.dart';
 import 'network/chat_client.dart';
+import 'security/activation_controller.dart';
 import 'screens/home_screen.dart';
+import 'screens/activation_screen.dart';
 
 bool shouldCloseOnLifecycle(AppLifecycleState state) =>
     state == AppLifecycleState.detached;
 
 final themeController = ThemeController();
 final chatClient = ChatClient();
+final activationController = ActivationController();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await themeController.load();
-  runApp(SecretChatApp(controller: themeController, chatClient: chatClient));
+  await activationController.load();
+  runApp(SecretChatApp(
+    controller: themeController,
+    chatClient: chatClient,
+    activationController: activationController,
+  ));
 }
 
 class SecretChatApp extends StatefulWidget {
-  const SecretChatApp({super.key, required this.controller, required this.chatClient});
+  const SecretChatApp({
+    super.key,
+    required this.controller,
+    required this.chatClient,
+    required this.activationController,
+  });
 
   final ThemeController controller;
   final ChatClient chatClient;
+  final ActivationController activationController;
 
   @override
   State<SecretChatApp> createState() => _SecretChatAppState();
@@ -51,13 +65,15 @@ class _SecretChatAppState extends State<SecretChatApp> with WidgetsBindingObserv
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: widget.controller,
+      animation: Listenable.merge([widget.controller, widget.activationController]),
       builder: (context, _) {
         final theme = widget.controller.theme;
         return MaterialApp(
           title: 'Secret Chat',
           debugShowCheckedModeBanner: false,
-          home: HomeScreen(theme: theme, controller: widget.controller, chatClient: widget.chatClient),
+          home: widget.activationController.activated
+              ? HomeScreen(theme: theme, controller: widget.controller, chatClient: widget.chatClient)
+              : ActivationScreen(theme: theme, controller: widget.activationController),
         );
       },
     );
