@@ -4,6 +4,15 @@ _Most recent changes appear at the top._
 
 ---
 
+## 2026-05-06 — Task 15: UI fidelity audit
+
+- Created `docs/ui-audit.md`: per-screen, per-component delta list vs design reference
+- 28 deltas (6 High, 14 Medium, 8 Low), 7 unimplemented features, 3 ambiguities
+- 12-item recommended cut for Task 16
+- Zero source file changes — read-only task
+- Branch: task/ui-audit
+- Commit: docs: ui fidelity audit — delta list for task 16
+
 ## 2026-05-06 — Task 14: Smooth session management
 
 - Added `ChatTerminationReason` enum (`peerLeft`, `connectionLost`) to ChatClient
