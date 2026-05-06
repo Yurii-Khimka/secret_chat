@@ -307,6 +307,87 @@ describe('secret-chat-server', { concurrency: false }, () => {
     await closeWs(b);
   });
 
+  // Password mode tests
+  describe('password_mode', () => {
+    test('create_room with password_mode true echoes password_mode true', async () => {
+      const ws = await connect();
+      await nextMessage(ws); // hello
+      ws.send(JSON.stringify({ type: 'create_room', password_mode: true }));
+      const msg = await nextMessage(ws);
+      assert.equal(msg.type, 'room_created');
+      assert.equal(msg.password_mode, true);
+      await closeWs(ws);
+    });
+
+    test('create_room with password_mode false echoes password_mode false', async () => {
+      const ws = await connect();
+      await nextMessage(ws); // hello
+      ws.send(JSON.stringify({ type: 'create_room', password_mode: false }));
+      const msg = await nextMessage(ws);
+      assert.equal(msg.type, 'room_created');
+      assert.equal(msg.password_mode, false);
+      await closeWs(ws);
+    });
+
+    test('create_room without password_mode defaults to false', async () => {
+      const ws = await connect();
+      await nextMessage(ws); // hello
+      ws.send(JSON.stringify({ type: 'create_room' }));
+      const msg = await nextMessage(ws);
+      assert.equal(msg.type, 'room_created');
+      assert.equal(msg.password_mode, false);
+      await closeWs(ws);
+    });
+
+    test('create_room with non-boolean password_mode rejects with bad_request', async () => {
+      const ws = await connect();
+      await nextMessage(ws); // hello
+      ws.send(JSON.stringify({ type: 'create_room', password_mode: 'yes' }));
+      const msg = await nextMessage(ws);
+      assert.equal(msg.type, 'error');
+      assert.equal(msg.code, 'bad_request');
+      await closeWs(ws);
+    });
+
+    test('joined event includes password_mode true for password room', async () => {
+      const a = await connect();
+      await nextMessage(a); // hello
+      a.send(JSON.stringify({ type: 'create_room', password_mode: true }));
+      const created = await nextMessage(a);
+
+      const b = await connect();
+      await nextMessage(b); // hello
+      b.send(JSON.stringify({ type: 'join_room', code: created.code }));
+      const joined = await nextMessage(b);
+      assert.equal(joined.type, 'joined');
+      assert.equal(joined.password_mode, true);
+      await nextMessage(a); // peer_joined
+
+      await closeWs(b);
+      await new Promise((r) => setTimeout(r, 50));
+      await closeWs(a);
+    });
+
+    test('joined event includes password_mode false for non-password room', async () => {
+      const a = await connect();
+      await nextMessage(a); // hello
+      a.send(JSON.stringify({ type: 'create_room', password_mode: false }));
+      const created = await nextMessage(a);
+
+      const b = await connect();
+      await nextMessage(b); // hello
+      b.send(JSON.stringify({ type: 'join_room', code: created.code }));
+      const joined = await nextMessage(b);
+      assert.equal(joined.type, 'joined');
+      assert.equal(joined.password_mode, false);
+      await nextMessage(a); // peer_joined
+
+      await closeWs(b);
+      await new Promise((r) => setTimeout(r, 50));
+      await closeWs(a);
+    });
+  });
+
   // Relay tests
   describe('Relay', () => {
     async function createPair() {

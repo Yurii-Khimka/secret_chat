@@ -6,7 +6,7 @@ import '../components/app_button.dart';
 import '../theme/theme_controller.dart';
 import '../components/pulse_dot.dart';
 import '../network/chat_client.dart';
-import 'room_created_screen.dart';
+import 'room_setup_screen.dart';
 import 'join_room_screen.dart';
 import 'settings_screen.dart';
 
@@ -27,55 +27,15 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  bool _creating = false;
-  String? _error;
-
-  void _onClientChanged() {
-    if (!mounted) return;
-    final client = widget.chatClient;
-    if (client.state == ChatConnectionState.connected && _creating) {
-      _creating = false;
-      _error = null;
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => RoomCreatedScreen(
-            theme: widget.theme,
-            chatClient: client,
-          ),
+  void _openRoomSetup() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => RoomSetupScreen(
+          theme: widget.theme,
+          chatClient: widget.chatClient,
         ),
-      );
-      setState(() {});
-    } else if (client.state == ChatConnectionState.error && _creating) {
-      _creating = false;
-      setState(() {
-        _error = _mapError(client.lastError);
-      });
-    }
-  }
-
-  String _mapError(String? code) {
-    return switch (code) {
-      'connection_failed' => '[ERROR] failed to connect',
-      'already_in_room' => '[ERROR] already in a room',
-      _ => '[ERROR] failed to create room',
-    };
-  }
-
-  Future<void> _createRoom() async {
-    setState(() {
-      _creating = true;
-      _error = null;
-    });
-    widget.chatClient.addListener(_onClientChanged);
-    await widget.chatClient.createRoom();
-    // If state already changed synchronously
-    _onClientChanged();
-  }
-
-  @override
-  void dispose() {
-    widget.chatClient.removeListener(_onClientChanged);
-    super.dispose();
+      ),
+    );
   }
 
   @override
@@ -184,23 +144,13 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
 
-            // ── Error text ─────────────────────────────
-            if (_error != null) ...[
-              Text(
-                _error!,
-                style: AppTypography.mono.copyWith(color: p.warning),
-              ),
-              const SizedBox(height: AppSpacing.sm),
-            ],
-
             // ── Bottom buttons ──────────────────────────
             AppButton(
-              label: _creating ? 'Connecting...' : 'Create Room',
+              label: 'Create Room',
               palette: p,
               expand: true,
-              enabled: !_creating,
               sub: 'Generates a new code + key pair',
-              onPressed: _creating ? null : _createRoom,
+              onPressed: _openRoomSetup,
             ),
             const SizedBox(height: AppSpacing.md),
             AppButton(

@@ -1,58 +1,59 @@
 # Last Task Result
 
 ## Task
-Task 7 — Flutter WebSocket client wired to real server (Phase 2). Closed out by Task 7b (UX gaps) and Task 7c (live verification).
+Phase 2 / Task 8 — Room Setup screen + `password_mode` protocol flag.
 
 ## Branch
-task/flutter-network-client
+task/room-setup-mode
 
 ## Commit
-docs: close out task 7 — owner-verified J.3–J.7 pass
+feat: room setup screen + password mode protocol flag
 
 ## What Was Done
 
-### UX changes (Task 7b)
+### Server protocol changes
+- `create_room` accepts optional `password_mode` boolean (defaults to `false`, rejects non-boolean with `bad_request`)
+- Room state in `rooms.js` stores `passwordMode` alongside existing fields
+- `room_created` response echoes `password_mode` back to creator
+- `joined` event includes the room's `password_mode` so joiner's client knows the mode
+- `peer_joined` does NOT include it (creator already knows)
+- One-line comment near log call documents the zero-data intent
 
-| File | Change |
-|------|--------|
-| `lib/screens/join_room_screen.dart` | Added `// password gate arrives in task 8` helper text below PASSWORD field (muted color) |
-| `lib/main.dart` | Lifecycle: only `detached` triggers close (removed `paused`) |
-| `lib/screens/chat_screen.dart` | Added `[plaintext — encryption arrives in task 9]` warning banner above message list |
-| `lib/components/system_message.dart` | Extended with `SystemMessageTone` enum (muted/warning) — reused, not duplicated |
+### ChatClient changes
+- Added `_passwordMode` field with public `passwordMode` getter
+- `createRoom()` gains `passwordMode` parameter, included in outgoing payload
+- `room_created` handler sets `_passwordMode` from server response
+- `joined` handler sets `_passwordMode` from server payload
+- `close()` resets `_passwordMode` to false
 
-### SystemMessage extension
-`lib/components/system_message.dart` — added `tone` parameter with `SystemMessageTone.muted` (default, backward compatible) and `SystemMessageTone.warning` (uses `palette.warning` color). No new component created.
+### RoomSetupScreen (replaces RoomCreatedScreen)
+- Renamed `room_created_screen.dart` -> `room_setup_screen.dart`, class `RoomSetupScreen`
+- Two visual states: configuring (before Generate Code) and code generated (after)
+- State 1: ROOM SETUP header, dashed placeholder code, nickname input (max 24, local-only), password mode toggle, GENERATE CODE CTA
+- State 2: ROOM CREATED + WAITING FOR PEER header, real code with copy, read-only nickname, locked toggle, step checklist (step 03 conditional on mode)
+- HomeScreen no longer calls server on CREATE ROOM -- navigates to RoomSetupScreen instead
 
-### Owner-verified live testing (Task 7c)
-The Owner manually executed J.1–J.7 against a real iPhone 17 simulator + running Node server + wscat. CocoaPods was installed to support iOS simulator builds. All steps passed.
+### JoinRoomScreen cleanup
+- Removed PASSWORD field, `_passwordController`, its disposal, and `// password gate arrives in task 8` helper
+- Added `// password mode is set by the room creator. you'll be told on connect.` system info text
 
-### J.1–J.7 Verification table
+### ChatScreen system message
+- `passwordMode == false` -> existing `[plaintext -- encryption arrives in task 9]` warning
+- `passwordMode == true` -> phrase-mode system message explaining the shared phrase model
 
-| Step | Action | Result | Observation |
-|------|--------|--------|-------------|
-| J.1 | `cd server && npm run dev` | PASS | server listening on http://127.0.0.1:3000 |
-| J.2 | `flutter run` on simulator | PASS | app launched on iPhone 17 simulator after CocoaPods install |
-| J.3 | Tap CREATE ROOM | PASS | CREATE ROOM produced a unique WORD-NNNN code on each tap |
-| J.4 | wscat join_room | PASS | wscat join_room -> simulator auto-navigated to ChatScreen with [plaintext — encryption arrives in task 9] banner visible |
-| J.5 | Bidirectional messages | PASS | messages flowed both directions (sim -> wscat and wscat -> sim) |
-| J.6 | Close wscat -> peer_left | PASS | closing wscat showed [peer disconnected — room closed] and disabled the composer |
-| J.7 | Reverse direction | PASS | reverse direction worked (app joined a wscat-created room, chat functioned) |
+### New component
+- `lib/components/app_toggle.dart` -- minimal toggle using design tokens (accent track, animated thumb)
+- `lib/components/app_text_field.dart` -- added `enabled` and `maxLength` parameters
 
-**Bonus:** Backgrounding the app for ~5s -> chat session survives (validates detached-only lifecycle fix). PASS.
-
-### flutter analyze
-No issues found.
-
-### flutter test — 19/19 pass
-
-### npm test — 29/29 pass
+### Tests
+- flutter analyze: no issues
+- flutter test: 27/27 pass (was 19)
+- npm test: 35/35 pass (was 29)
 
 ## Status
 Done
 
 ## Notes
-- `ChatClient` follows the same `ChangeNotifier` injection pattern as `ThemeController` — passed through constructors, no DI framework.
-- RoomCreatedScreen auto-navigates when `peer_joined` arrives (no manual "Open Chat" button).
-- ChatScreen shows "PLAINTEXT" indicator + warning banner since there's no crypto yet.
-- The PASSWORD field on JoinRoomScreen is visible and typeable but not wired. Helper text and a `// TODO(task-8): wire password to Argon2` code comment mark the integration point.
-- App lifecycle: only `detached` triggers `chatClient.close()`; `paused` (backgrounding) preserves the session — verified manually.
+- No crypto in this task -- messages remain plaintext for both modes
+- The `theme_persistence_test.dart`, `widget_test.dart`, and `protocol_test.dart` were previously untracked (never committed to git). They are now tracked in this commit.
+- What's next: live verification of the new flow happens in Task 8b after the Owner runs the simulator. Do NOT attempt manual sim verification.

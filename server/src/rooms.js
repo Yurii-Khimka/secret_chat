@@ -24,11 +24,11 @@ function generateCode() {
   throw new RoomCodeExhaustedError();
 }
 
-export function createRoom(ws) {
+export function createRoom(ws, passwordMode = false) {
   if (ws.roomCode) throw new AlreadyInRoomError();
   const code = generateCode();
   ws.roomCode = code;
-  rooms.set(code, { creator: ws, joiner: null, createdAt: Date.now(), pairedAt: null });
+  rooms.set(code, { creator: ws, joiner: null, passwordMode, createdAt: Date.now(), pairedAt: null });
   return code;
 }
 

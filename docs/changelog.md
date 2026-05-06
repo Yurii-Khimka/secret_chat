@@ -4,6 +4,18 @@ _Most recent changes appear at the top._
 
 ---
 
+## 2026-05-05 — Task 8: Room Setup + password_mode protocol flag
+
+- Server: `create_room` accepts `password_mode` bool, echoed in `room_created`, included in `joined` for joiner
+- Renamed `RoomCreatedScreen` -> `RoomSetupScreen` with two-state flow (setup -> code generated)
+- Created `AppToggle` component for password mode switch
+- Removed PASSWORD field from JoinRoomScreen; added info text about creator-controlled mode
+- ChatScreen shows phrase-mode system message when `passwordMode == true`
+- No crypto yet -- messages remain plaintext for both modes (Task 9)
+- Tests: flutter 27/27 (was 19), server 35/35 (was 29)
+- Branch: task/room-setup-mode
+- Commit: feat: room setup screen + password mode protocol flag
+
 ## 2026-05-05 — Task 7 closed — live verification
 
 - J.3–J.7 PASS on iPhone 17 simulator + real server + wscat

@@ -13,7 +13,7 @@ import {
   MSG_JOIN_ROOM, MSG_JOINED, MSG_PEER_JOINED, MSG_PEER_LEFT,
   MSG_MSG,
 } from './protocol.js';
-import { createRoom, joinRoom, leaveRoom, getPeer, AlreadyInRoomError, RoomCodeExhaustedError } from './rooms.js';
+import { createRoom, joinRoom, leaveRoom, getPeer, getRoom, AlreadyInRoomError, RoomCodeExhaustedError } from './rooms.js';
 
 const HEARTBEAT_INTERVAL = 30_000;
 
@@ -48,9 +48,19 @@ export function attachWebSocket(httpServer) {
 
       switch (msg.type) {
         case MSG_CREATE_ROOM: {
+          // Validate password_mode: absent → false, boolean → pass through, else reject.
+          let passwordMode = false;
+          if ('password_mode' in msg) {
+            if (typeof msg.password_mode !== 'boolean') {
+              ws.send(errorMessage('bad_request', 'invalid password_mode'));
+              break;
+            }
+            passwordMode = msg.password_mode;
+          }
           try {
-            const code = createRoom(ws);
-            ws.send(JSON.stringify({ type: MSG_ROOM_CREATED, code }));
+            const code = createRoom(ws, passwordMode);
+            // Do not log passwordMode alongside code — see zero-data policy.
+            ws.send(JSON.stringify({ type: MSG_ROOM_CREATED, code, password_mode: passwordMode }));
           } catch (err) {
             if (err instanceof AlreadyInRoomError) {
               ws.send(errorMessage('already_in_room', 'this connection already has a room'));
@@ -67,7 +77,8 @@ export function attachWebSocket(httpServer) {
           }
           const result = joinRoom(ws, msg.code);
           if (result.ok) {
-            ws.send(JSON.stringify({ type: MSG_JOINED, code: msg.code }));
+            const room = getRoom(msg.code);
+            ws.send(JSON.stringify({ type: MSG_JOINED, code: msg.code, password_mode: room.passwordMode }));
             result.creator.send(JSON.stringify({ type: MSG_PEER_JOINED }));
           } else {
             const reasons = {

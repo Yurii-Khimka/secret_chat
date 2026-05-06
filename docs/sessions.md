@@ -308,6 +308,25 @@ Done
 
 ---
 
+## Session 2026-05-05 — Task 8: Room Setup + password_mode protocol flag
+
+### Completed
+- Server: `create_room` accepts `password_mode`, `room_created` echoes it, `joined` includes it for joiner
+- Client: `ChatClient.createRoom(passwordMode:)` + getter, protocol classes updated
+- Renamed `RoomCreatedScreen` → `RoomSetupScreen` with two-state flow (configuring → code generated)
+- Removed PASSWORD field from JoinRoomScreen, added info text
+- ChatScreen: conditional system message based on `passwordMode`
+- Created `AppToggle` component, extended `AppTextField` with `enabled`/`maxLength`
+- flutter analyze: clean, flutter test: 27/27, npm test: 35/35
+
+### Branch
+task/room-setup-mode
+
+### Status
+Done
+
+---
+
 ## Phase 2 — Confirmed Constraints (locked 2026-05-05)
 
 These decisions are locked for the rest of Phase 2 (Argon2 + AES). Future tasks must not deviate without an explicit Tech Lead / Owner re-decision.
