@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -318,10 +319,12 @@ void main() {
       client.debugInjectDone();
       expect(client.terminationReason, ChatTerminationReason.connectionLost);
 
-      // createRoom will fail to connect (no server) but still clears the reason
       await client.close();
-      try { await client.createRoom(); } catch (_) {}
+      // terminationReason is cleared synchronously before _connect(),
+      // so fire-and-forget to avoid network timeout.
+      unawaited(client.createRoom());
       expect(client.terminationReason, isNull);
+      await client.close();
     });
 
     test('terminationReason cleared on next joinRoom', () async {
@@ -331,8 +334,9 @@ void main() {
       expect(client.terminationReason, ChatTerminationReason.connectionLost);
 
       await client.close();
-      try { await client.joinRoom('WOLF-1234'); } catch (_) {}
+      unawaited(client.joinRoom('WOLF-1234'));
       expect(client.terminationReason, isNull);
+      await client.close();
     });
 
     test('pre-pairing close() leaves terminationReason null', () async {

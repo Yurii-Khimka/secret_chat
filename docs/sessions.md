@@ -320,7 +320,8 @@ Done
 - main.dart gates HomeScreen behind activation via Listenable.merge
 - 21 new tests (11 verification, 6 controller, 4 screen)
 - docs/readme.md: "Activation (v1)" section added
-- Tests: flutter 123 (was 102), server 43 (unchanged)
+- Tests: flutter 123/123 (was 102), server 43/43 (unchanged)
+- + Task 17a: fixed 6 test timeouts from unawaited WebSocket connections in tests (not Caret-related)
 
 ### Branch
 task/activation-gate-v1

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -54,11 +55,13 @@ void main() {
   });
 
   group('ChatClient isHost + localNickname', () {
+    // State (isHost, localNickname) is set synchronously before _connect(),
+    // so we fire-and-forget createRoom/joinRoom and check immediately.
+    // No server needed — these tests verify the synchronous state-setting path.
+
     test('createRoom sets isHost=true and localNickname', () async {
       final client = ChatClient();
-      // We can't fully connect in tests, but we can verify state is set
-      // before the connect call by inspecting after the error state
-      await client.createRoom(nickname: 'alice');
+      unawaited(client.createRoom(nickname: 'alice'));
       expect(client.isHost, true);
       expect(client.localNickname, 'alice');
       await client.close();
@@ -66,7 +69,7 @@ void main() {
 
     test('joinRoom trims nickname and sets isHost=false', () async {
       final client = ChatClient();
-      await client.joinRoom('WOLF-1234', nickname: '  bob  ');
+      unawaited(client.joinRoom('WOLF-1234', nickname: '  bob  '));
       expect(client.isHost, false);
       expect(client.localNickname, 'bob');
       await client.close();
@@ -74,7 +77,7 @@ void main() {
 
     test('joinRoom with blank nickname sets localNickname=null', () async {
       final client = ChatClient();
-      await client.joinRoom('WOLF-1234', nickname: '   ');
+      unawaited(client.joinRoom('WOLF-1234', nickname: '   '));
       expect(client.isHost, false);
       expect(client.localNickname, null);
       await client.close();
@@ -82,7 +85,8 @@ void main() {
 
     test('close resets isHost and localNickname to null', () async {
       final client = ChatClient();
-      await client.createRoom(nickname: 'alice');
+      unawaited(client.createRoom(nickname: 'alice'));
+      expect(client.isHost, true);
       await client.close();
       expect(client.isHost, null);
       expect(client.localNickname, null);

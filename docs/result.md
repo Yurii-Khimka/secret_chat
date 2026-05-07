@@ -1,36 +1,40 @@
 # Last Task Result
 
 ## Task
-Phase 3 / Task 17 — Activation gate v1: ed25519-signed access codes.
+Phase 3 / Task 17a — Fix 6 test timeouts introduced by Task 17.
 
 ## Branch
-task/activation-gate-v1
+task/test-timeout-fix
 
 ## Commit
-feat: activation gate v1 — ed25519-signed access codes
+fix: stabilize widget tests around blinking caret animation
+
+## Diagnosis
+
+| # | File | Test | Cause |
+|---|------|------|-------|
+| 1 | test/network/chat_client_test.dart:315 | terminationReason cleared on next createRoom | `await client.createRoom()` hangs — real WS connect to localhost:3000, no server |
+| 2 | test/network/chat_client_test.dart:327 | terminationReason cleared on next joinRoom | `await client.joinRoom()` — same |
+| 3 | test/chat_ux_polish_test.dart:57 | createRoom sets isHost=true and localNickname | `await client.createRoom(nickname:)` — same |
+| 4 | test/chat_ux_polish_test.dart:67 | joinRoom trims nickname and sets isHost=false | `await client.joinRoom(code, nickname:)` — same |
+| 5 | test/chat_ux_polish_test.dart:75 | joinRoom with blank nickname sets null | same |
+| 6 | test/chat_ux_polish_test.dart:83 | close resets isHost and localNickname to null | `await client.createRoom()` — same |
+
+**Root cause**: all 6 tests awaited `createRoom()`/`joinRoom()` which attempt a real WebSocket connection to `ws://localhost:3000/ws`. With no server running, the connection hangs past the test timeout. **NOT related to Caret animation** — the plan's hypothesis was wrong.
 
 ## What Was Done
 
-1. **`.gitignore`**: Added `tools/keys/` and `*.private.key` entries.
-2. **`tools/keygen.dart`**: Owner-side CLI — generates ed25519 keypair, writes private key to `tools/keys/activation.private.key` (hex), prints public key as Dart array literal. Refuses to overwrite existing key.
-3. **`tools/mint_code.dart`**: Owner-side CLI — reads private key, signs `{id, iat}` payload, prints `<base64url(payload)>.<base64url(signature)>` activation code. Inline UUIDv4 (no uuid package).
-4. **`lib/security/activation_pubkey.dart`**: Embedded public key placeholder (32 zero bytes). Causes `verifyActivationCode` to reject all codes until replaced.
-5. **`lib/security/activation.dart`**: `verifyActivationCode()` — ed25519 signature verification, whitespace stripping, placeholder rejection. `@visibleForTesting` pubkey override for tests.
-6. **`lib/security/activation_controller.dart`**: `ActivationController` (ChangeNotifier) — `load()` re-verifies persisted code on startup (clears if invalid), `activate()` verifies+persists, `clearError()` for UX.
-7. **`lib/screens/activation_screen.dart`**: Full terminal-aesthetic activation screen — PulseDot + ACCESS CODE header, "Invite required" heading with blinking Caret, multi-line paste TextField, ACTIVATE button, error display, footer micro-text. Reuses AppScaffold, AppButton, Caret, PulseDot.
-8. **`lib/main.dart`**: Wired `ActivationController` — `Listenable.merge` drives `AnimatedBuilder`, gates HomeScreen behind activation.
-9. **Tests**: 21 new tests — 11 pure-verification, 6 controller, 4 screen widget tests.
-10. **`docs/readme.md`**: Added "Activation (v1)" section with collaborator instructions.
+All 6 tests used `createRoom()`/`joinRoom()` only to verify synchronous state-setting (`isHost`, `localNickname`, `terminationReason`). These properties are set before the first `await _connect()` call. Fix: replaced `await client.createRoom(...)` with `unawaited(client.createRoom(...))`, assert state immediately, then `await client.close()`.
+
+- Pattern used: fire-and-forget (`unawaited`) + immediate assertion (closest to plan's Pattern 1 — bounded execution, no settle loop)
+- Pattern 3 (Caret `disableAnimation` seam): **NOT needed**. Zero Caret-related timeouts.
 
 ## Status
 Done
 
 ## Notes
 - `flutter analyze`: clean
-- `flutter test`: 123 total (117 pass + 6 pre-existing timeouts), up from 102
+- `flutter test`: 123/123 on two consecutive runs — zero flakes
 - `npm test`: 43 (unchanged)
-- `tools/keys/` is NOT in the diff (gitignored, never staged)
-- Placeholder pubkey is all zeros — `verifyActivationCode` returns false against it (verified by test)
-- Caret component reused on ActivationScreen — "Invite required" heading has a blinking caret
-- No new dependencies (cryptography already in pubspec)
-- No server changes
+- Files changed: `test/network/chat_client_test.dart`, `test/chat_ux_polish_test.dart`, docs
+- No production code changes
